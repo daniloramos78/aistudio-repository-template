@@ -38,7 +38,7 @@ class SistemaScada:
             )
 
         for datalogger in self.hukseflux_hb500:
-            self._coletar_e_salvar(datalogger.nome, datalogger.ler_sensores_convertidos)
+            self._coletar_e_salvar(datalogger.nome, datalogger.get_all_data)
 
     def executar(self) -> None:
         """Roda o loop principal do SCADA."""
@@ -125,13 +125,6 @@ class SistemaScada:
                     porta=equipamento.get("porta", 502),
                     timeout=equipamento.get("timeout", 3.0),
                     device_id=equipamento.get("device_id", 1),
-                    endereco_base_ai=equipamento.get("endereco_base_ai", 0),
-                    escala_mv=equipamento.get("escala_mv", 1.0),
-                    registrador_assinado=equipamento.get(
-                        "registrador_assinado",
-                        equipamento.get("signed", False),
-                    ),
-                    canais=equipamento.get("canais"),
                 )
             )
 

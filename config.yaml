@@ -37,24 +37,6 @@ equipamentos:
     porta: 502
     timeout: 3.0
     device_id: 1
-    endereco_base_ai: 0
-    escala_mv: 1.0
-    signed: true
-    canais:
-      AI0:
-        nome: irradiancia_global
-        tipo: irradiancia
-        sensibilidade_mv_por_wm2: 0.01
-      AI1:
-        nome: temperatura_modulo
-        tipo: temperatura
-        ganho_c_por_mv: 0.1
-        offset_c: 0.0
-      AI2:
-        nome: temperatura_ambiente
-        tipo: temperatura
-        ganho_c_por_mv: 0.1
-        offset_c: 0.0
 
 logging:
   tipo: sqlite

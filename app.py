@@ -17,11 +17,27 @@ class Usina:
     status: str
 
 
+@dataclass(frozen=True)
+class EquipamentoVinculado:
+    usina: str
+    equipamento: str
+    tipo: str
+    status: str
+
+
+ESTACAO_NOME = "Manga Grande"
+
 USINAS = [
     Usina("UFV Manga Grande 01", "Janauba - MG", 742.5, 82, "Online"),
     Usina("UFV Manga Grande 02", "Janauba - MG", 618.0, 74, "Online"),
     Usina("UFV Rio Verde", "Rio Verde - GO", 521.4, 58, "Online"),
     Usina("UFV Sertao Azul", "Petrolina - PE", 430.0, 0, "Offline"),
+]
+
+EQUIPAMENTOS_VINCULADOS = [
+    EquipamentoVinculado("UFV Manga Grande 01", ESTACAO_NOME, "Estacao Solar HB500", "Online"),
+    EquipamentoVinculado("UFV Manga Grande 01", "Inversor 01", "Inversor", "Online"),
+    EquipamentoVinculado("UFV Manga Grande 02", "Inversor 02", "Inversor", "Online"),
 ]
 
 DADOS_HB500_FALLBACK = {
@@ -64,6 +80,8 @@ def main() -> None:
 
     if pagina == "Resumo Geral":
         render_resumo_geral()
+    elif pagina == "Configurações":
+        render_configuracoes()
     else:
         render_placeholder(pagina)
 
@@ -97,7 +115,7 @@ def aplicar_css() -> None:
             gap: 1rem;
             margin-bottom: 1.4rem;
         }
-        .metric-card, .station-card, .plant-card {
+        .metric-card, .station-card, .plant-card, .config-card {
             background: #ffffff;
             border-radius: 20px;
             box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
@@ -144,6 +162,10 @@ def aplicar_css() -> None:
         }
         .plant-card {
             padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .config-card {
+            padding: 1.3rem;
             margin-bottom: 1rem;
         }
         .plant-title {
@@ -195,7 +217,7 @@ def render_resumo_geral() -> None:
     with col1:
         render_metric_card("Potência Total Instalada", f"{potencia_total:,.1f} kWp", "Portfólio monitorado")
     with col2:
-        render_metric_card("Status da Estação Solar", status_estacao, f"Fonte: HB500 ({fonte_hb500})")
+        render_metric_card(f"Status da Estação {ESTACAO_NOME}", status_estacao, f"Fonte: HB500 ({fonte_hb500})")
     with col3:
         render_metric_card("Usinas Online/Offline", f"{online}/{offline}", "Disponibilidade operacional")
 
@@ -233,8 +255,8 @@ def render_station_card(dados: dict[str, float], fonte: str) -> None:
     st.markdown(
         f"""
         <div class='station-card'>
-            <div class='plant-title'>Hukseflux HB500</div>
-            <div class='plant-meta'>Dados da estação solar em {fonte}</div>
+            <div class='plant-title'>Estação {ESTACAO_NOME}</div>
+            <div class='plant-meta'>Dados do Hukseflux HB500 em {fonte}</div>
             <div class='station-grid'>
                 <div class='station-metric'>
                     <div class='metric-label'>GHI</div>
@@ -290,6 +312,47 @@ def render_usina_card(usina: Usina) -> None:
         unsafe_allow_html=True,
     )
     st.progress(usina.geracao_percentual / 100, text=f"{usina.geracao_percentual}% da geração esperada")
+
+
+def render_configuracoes() -> None:
+    st.markdown("<div class='page-title'>Configurações</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='page-subtitle'>Vincule estações, inversores e dataloggers às usinas monitoradas.</div>",
+        unsafe_allow_html=True,
+    )
+
+    col_form, col_lista = st.columns([1, 1.25])
+
+    with col_form:
+        st.markdown("<div class='config-card'><div class='plant-title'>Vincular equipamento</div>", unsafe_allow_html=True)
+        usina = st.selectbox("Usina", [item.nome for item in USINAS])
+        tipo = st.selectbox("Tipo de equipamento", ["Estacao Solar HB500", "Inversor", "Medidor", "Gateway MQTT"])
+        nome = st.text_input("Nome do equipamento", value=ESTACAO_NOME if tipo == "Estacao Solar HB500" else "")
+        ip = st.text_input("IP Modbus TCP", value="192.168.0.30")
+        porta = st.number_input("Porta", min_value=1, max_value=65535, value=502)
+        if st.button("Salvar vínculo", type="primary"):
+            st.success(f"{nome or tipo} vinculado à {usina} em {ip}:{porta}.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_lista:
+        st.markdown("<div class='config-card'><div class='plant-title'>Equipamentos vinculados</div>", unsafe_allow_html=True)
+        for equipamento in EQUIPAMENTOS_VINCULADOS:
+            status_classe = "status-online" if equipamento.status == "Online" else "status-offline"
+            st.markdown(
+                f"""
+                <div class='plant-card'>
+                    <div style='display:flex; justify-content:space-between; align-items:center; gap:1rem;'>
+                        <div>
+                            <div class='plant-title'>{equipamento.equipamento}</div>
+                            <div class='plant-meta'>{equipamento.usina} • {equipamento.tipo}</div>
+                        </div>
+                        <span class='{status_classe}'>{equipamento.status}</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_placeholder(pagina: str) -> None:

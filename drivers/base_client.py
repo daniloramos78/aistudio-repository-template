@@ -56,10 +56,18 @@ class BaseModbusClient:
 
     def ler_holding_registers(self, endereco: int, quantidade: int) -> list[int]:
         """Le holding registers com reconexao automatica em caso de falha."""
+        return self._ler_registros_modbus("read_holding_registers", endereco, quantidade)
+
+    def ler_input_registers(self, endereco: int, quantidade: int) -> list[int]:
+        """Le input registers com reconexao automatica em caso de falha."""
+        return self._ler_registros_modbus("read_input_registers", endereco, quantidade)
+
+    def _ler_registros_modbus(self, metodo: str, endereco: int, quantidade: int) -> list[int]:
         self.garantir_conexao()
         assert self.cliente is not None
 
-        resposta = self.cliente.read_holding_registers(
+        leitor = getattr(self.cliente, metodo)
+        resposta = leitor(
             address=endereco,
             count=quantidade,
             slave=self.device_id,
@@ -69,7 +77,8 @@ class BaseModbusClient:
             self.desconectar()
             self.garantir_conexao()
             assert self.cliente is not None
-            resposta = self.cliente.read_holding_registers(
+            leitor = getattr(self.cliente, metodo)
+            resposta = leitor(
                 address=endereco,
                 count=quantidade,
                 slave=self.device_id,

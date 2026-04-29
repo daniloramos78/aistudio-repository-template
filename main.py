@@ -9,6 +9,7 @@ import yaml
 
 from database.logger import DataLogger
 from drivers.estacao_solar import EstacaoSolar
+from drivers.hukseflux_hb500 import HuksefluxHB500
 from drivers.inversor import Inversor
 from services.mqtt_sender import MqttSender
 
@@ -21,6 +22,7 @@ class SistemaScada:
         self.logger = self._criar_logger(self.config["logging"])
         self.inversores = self._criar_inversores(self.config["equipamentos"])
         self.estacoes_solares = self._criar_estacoes_solares(self.config["equipamentos"])
+        self.hukseflux_hb500 = self._criar_hukseflux_hb500(self.config["equipamentos"])
         self.mqtt_sender = self._criar_mqtt_sender(self.config.get("mqtt"))
 
     def executar_ciclo(self) -> None:
@@ -35,6 +37,9 @@ class SistemaScada:
                 publicar_mqtt=True,
             )
 
+        for datalogger in self.hukseflux_hb500:
+            self._coletar_e_salvar(datalogger.nome, datalogger.ler_sensores_convertidos)
+
     def executar(self) -> None:
         """Roda o loop principal do SCADA."""
         intervalo = self.config["logging"].get("intervalo_segundos", 5)
@@ -46,7 +51,7 @@ class SistemaScada:
         except KeyboardInterrupt:
             print("SistemaScada finalizado pelo usuario.")
         finally:
-            for equipamento in [*self.inversores, *self.estacoes_solares]:
+            for equipamento in [*self.inversores, *self.estacoes_solares, *self.hukseflux_hb500]:
                 equipamento.desconectar()
             if self.mqtt_sender is not None:
                 self.mqtt_sender.desconectar()
@@ -106,6 +111,29 @@ class SistemaScada:
         return estacoes
 
     @staticmethod
+    def _criar_hukseflux_hb500(equipamentos: dict[str, dict[str, Any]]) -> list[HuksefluxHB500]:
+        dataloggers: list[HuksefluxHB500] = []
+
+        for nome, equipamento in equipamentos.items():
+            if equipamento.get("tipo") != "hukseflux_hb500":
+                continue
+
+            dataloggers.append(
+                HuksefluxHB500(
+                    nome=nome,
+                    host=equipamento["host"],
+                    porta=equipamento.get("porta", 502),
+                    timeout=equipamento.get("timeout", 3.0),
+                    device_id=equipamento.get("device_id", 1),
+                    endereco_base_ai=equipamento.get("endereco_base_ai", 0),
+                    escala_mv=equipamento.get("escala_mv", 1.0),
+                    canais=equipamento.get("canais"),
+                )
+            )
+
+        return dataloggers
+
+    @staticmethod
     def _criar_mqtt_sender(config: dict[str, Any] | None) -> MqttSender | None:
         if not config or not config.get("habilitado", False):
             return None
@@ -121,7 +149,7 @@ class SistemaScada:
     def _coletar_e_salvar(
         self,
         equipamento: str,
-        coletor: Callable[[], dict[str, int]],
+        coletor: Callable[[], dict[str, int | float]],
         publicar_mqtt: bool = False,
     ) -> None:
         try:

@@ -2,3 +2,5 @@ pymodbus
 pyyaml
 pandas
 paho-mqtt
+streamlit
+streamlit-option-menu

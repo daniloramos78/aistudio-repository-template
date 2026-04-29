@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import streamlit as st
+import yaml
 from streamlit_option_menu import option_menu
 
-from main import SistemaScada
+from drivers.hukseflux_hb500 import HuksefluxHB500
 
 
 @dataclass(frozen=True)
@@ -230,12 +232,31 @@ def render_resumo_geral() -> None:
 
 def carregar_dados_hb500() -> tuple[dict[str, float], str]:
     try:
-        sistema = SistemaScada("config.yaml")
-        if not sistema.hukseflux_hb500:
+        equipamento = carregar_config_hb500("config.yaml")
+        if equipamento is None:
             return DADOS_HB500_FALLBACK, "amostra"
-        return sistema.hukseflux_hb500[0].get_all_data(), "tempo real"
+        return equipamento.get_all_data(), "tempo real"
     except Exception:
         return DADOS_HB500_FALLBACK, "amostra"
+
+
+def carregar_config_hb500(config_path: str) -> HuksefluxHB500 | None:
+    with Path(config_path).open("r", encoding="utf-8") as arquivo:
+        config = yaml.safe_load(arquivo)
+
+    for nome, equipamento in config.get("equipamentos", {}).items():
+        if equipamento.get("tipo") != "hukseflux_hb500":
+            continue
+
+        return HuksefluxHB500(
+            nome=nome,
+            host=equipamento["host"],
+            porta=equipamento.get("porta", 502),
+            timeout=equipamento.get("timeout", 3.0),
+            device_id=equipamento.get("device_id", 1),
+        )
+
+    return None
 
 
 def render_metric_card(rotulo: str, valor: str, rodape: str) -> None:

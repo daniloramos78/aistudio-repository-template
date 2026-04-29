@@ -38,6 +38,7 @@ def main() -> None:
         page_icon="☀️",
         layout="wide",
     )
+    st.title('Teste')
     aplicar_css()
 
     with st.sidebar:
@@ -90,11 +91,18 @@ def aplicar_css() -> None:
             color: #64748b;
             margin-bottom: 1.5rem;
         }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.4rem;
+        }
         .metric-card, .station-card, .plant-card {
             background: #ffffff;
             border-radius: 20px;
             box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
             border: 1px solid rgba(148, 163, 184, 0.16);
+            overflow: hidden;
         }
         .metric-card {
             padding: 1.35rem;
@@ -104,12 +112,15 @@ def aplicar_css() -> None:
             color: #64748b;
             font-size: 0.92rem;
             font-weight: 600;
+            overflow-wrap: anywhere;
         }
         .metric-value {
             color: #0f172a;
-            font-size: 2rem;
+            font-size: clamp(1.35rem, 2.5vw, 2rem);
             font-weight: 800;
             margin-top: 0.45rem;
+            line-height: 1.15;
+            overflow-wrap: anywhere;
         }
         .metric-footnote {
             color: #10b981;
@@ -122,7 +133,7 @@ def aplicar_css() -> None:
         }
         .station-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }

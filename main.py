@@ -1,45 +1,82 @@
-from pymodbus.client import ModbusTcpClient
+from __future__ import annotations
+
+import time
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from database.logger import DataLogger
+from drivers.inversor import Inversor
 
 
 class SistemaScada:
-    """Cliente simples para comunicação SCADA via Modbus TCP."""
+    """Coordena configuracao, leitura Modbus e persistencia dos dados."""
 
-    def __init__(self, host: str, porta: int = 502, timeout: float = 3.0) -> None:
-        self.host = host
-        self.porta = porta
-        self.timeout = timeout
-        self.cliente = ModbusTcpClient(host=self.host, port=self.porta, timeout=self.timeout)
+    def __init__(self, config_path: str = "config.yaml") -> None:
+        self.config = self._carregar_config(config_path)
+        self.logger = self._criar_logger(self.config["logging"])
+        self.inversores = self._criar_inversores(self.config["equipamentos"])
 
-    def conectar(self) -> bool:
-        """Conecta ao servidor Modbus TCP configurado."""
-        return self.cliente.connect()
+    def executar_ciclo(self) -> None:
+        """Executa uma rodada de leitura para todos os inversores configurados."""
+        for inversor in self.inversores:
+            try:
+                dados = inversor.ler_medicoes()
+            except Exception as exc:
+                print(f"Falha ao ler {inversor.nome}: {exc}")
+                continue
 
-    def desconectar(self) -> None:
-        """Encerra a conexão com o servidor Modbus TCP."""
-        self.cliente.close()
+            self.logger.salvar_leitura(inversor.nome, dados)
+            print(f"Dados salvos para {inversor.nome}: {dados}")
 
-    def ler_registros(self, endereco: int, quantidade: int, device_id: int = 1) -> list[int]:
-        """Le registros holding a partir de um endereco Modbus."""
-        resposta = self.cliente.read_holding_registers(
-            address=endereco,
-            count=quantidade,
-            slave=device_id,
-        )
+    def executar(self) -> None:
+        """Roda o loop principal do SCADA."""
+        intervalo = self.config["logging"].get("intervalo_segundos", 5)
 
-        if resposta.isError():
-            raise RuntimeError(f"Erro ao ler registros Modbus: {resposta}")
+        try:
+            while True:
+                self.executar_ciclo()
+                time.sleep(intervalo)
+        except KeyboardInterrupt:
+            print("SistemaScada finalizado pelo usuario.")
+        finally:
+            for inversor in self.inversores:
+                inversor.desconectar()
 
-        return resposta.registers
+    @staticmethod
+    def _carregar_config(config_path: str) -> dict[str, Any]:
+        caminho = Path(config_path)
+        with caminho.open("r", encoding="utf-8") as arquivo:
+            return yaml.safe_load(arquivo)
+
+    @staticmethod
+    def _criar_logger(config: dict[str, Any]) -> DataLogger:
+        tipo = config.get("tipo", "sqlite")
+        caminho = config["sqlite_path"] if tipo == "sqlite" else config["csv_path"]
+        return DataLogger(tipo=tipo, caminho=caminho)
+
+    @staticmethod
+    def _criar_inversores(equipamentos: dict[str, dict[str, Any]]) -> list[Inversor]:
+        inversores: list[Inversor] = []
+
+        for nome, equipamento in equipamentos.items():
+            if equipamento.get("tipo") != "inversor":
+                continue
+
+            inversores.append(
+                Inversor(
+                    nome=nome,
+                    host=equipamento["host"],
+                    porta=equipamento.get("porta", 502),
+                    timeout=equipamento.get("timeout", 3.0),
+                    device_id=equipamento.get("device_id", 1),
+                    registradores=equipamento["registradores"],
+                )
+            )
+
+        return inversores
 
 
 if __name__ == "__main__":
-    scada = SistemaScada(host="127.0.0.1")
-
-    if scada.conectar():
-        try:
-            print("Conectado ao servidor Modbus TCP.")
-            print(scada.ler_registros(endereco=0, quantidade=2))
-        finally:
-            scada.desconectar()
-    else:
-        print("Nao foi possivel conectar ao servidor Modbus TCP.")
+    SistemaScada().executar()

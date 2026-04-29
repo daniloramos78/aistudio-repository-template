@@ -1,3 +1,4 @@
 pymodbus
 pyyaml
 pandas
+paho-mqtt

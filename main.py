@@ -127,6 +127,7 @@ class SistemaScada:
                     device_id=equipamento.get("device_id", 1),
                     endereco_base_ai=equipamento.get("endereco_base_ai", 0),
                     escala_mv=equipamento.get("escala_mv", 1.0),
+                    registrador_assinado=equipamento.get("registrador_assinado", False),
                     canais=equipamento.get("canais"),
                 )
             )

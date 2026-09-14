@@ -1,5 +1,21 @@
 export type Polaridade = "" | "Ok" | "Nok";
 
+export type ColumnId =
+  | "mesa"
+  | "stringNo"
+  | "pv"
+  | "mppt"
+  | "tensaoVoc"
+  | "polaridade"
+  | "flutPositivo"
+  | "flutNegativo"
+  | "tensaoAplicada"
+  | "isolamentoTempo"
+  | "isolamentoMohm"
+  | "isolamentoGohm";
+
+export type ColumnConfig = Record<ColumnId, boolean>;
+
 export interface TestRow {
   id: string;
   mesa: string;
@@ -30,6 +46,7 @@ export interface Workbook {
   temperatura: string;
   tecnico: string;
   observacoes: string;
+  columns: ColumnConfig;
   inverters: Inverter[];
   activeInverterId: string;
 }

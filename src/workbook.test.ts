@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addMesa,
+  addString,
   createEmptyWorkbook,
   createExampleWorkbook,
   inverterHasData,
@@ -20,6 +21,7 @@ describe("workbook", () => {
     expect(restored.ufv).toBe(book.ufv);
     expect(restored.inverters).toHaveLength(4);
     expect(restored.activeInverterId).toBe(book.activeInverterId);
+    expect(restored.columns.mesa).toBe(true);
   });
 
   it("adds a mesa with two strings and marks the first row", () => {
@@ -27,8 +29,10 @@ describe("workbook", () => {
     const inverter = addMesa(book.inverters[0], "Mesa 01");
     expect(inverter.rows).toHaveLength(2);
     expect(inverter.rows[0].mesa).toBe("Mesa 01");
-    expect(inverter.rows[0].stringNo).toBe("1");
-    expect(inverter.rows[1].stringNo).toBe("2");
+    expect(inverter.rows[0].stringNo).toBe("");
+    expect(inverter.rows[0].pv).toBe("");
+    expect(inverter.rows[0].tensaoAplicada).toBe("");
+    expect(inverter.rows[1].stringNo).toBe("");
     expect(isFirstOfMesa(inverter.rows, 0)).toBe(true);
     expect(isFirstOfMesa(inverter.rows, 1)).toBe(false);
   });
@@ -56,5 +60,22 @@ describe("workbook", () => {
   it("formats inverter numbering", () => {
     expect(inverterNumberFromName("INVERSOR_04")).toBe("04");
     expect(inverterNameFromNumber("7")).toBe("INVERSOR_07");
+  });
+
+  it("adds empty strings without auto-filled test values", () => {
+    const inverter = addString(createEmptyWorkbook().inverters[0], false);
+    expect(inverter.rows).toHaveLength(1);
+    expect(inverter.rows[0].stringNo).toBe("");
+    expect(inverter.rows[0].pv).toBe("");
+    expect(inverter.rows[0].tensaoAplicada).toBe("");
+    expect(inverter.rows[0].isolamentoTempo).toBe("");
+  });
+
+  it("keeps all columns when opening a file saved before column config existed", () => {
+    const raw = JSON.parse(serializeWorkbook(createEmptyWorkbook())) as Record<string, unknown>;
+    delete raw.columns;
+    const restored = parseWorkbook(JSON.stringify(raw));
+    expect(restored.columns.mesa).toBe(true);
+    expect(restored.columns.mppt).toBe(true);
   });
 });

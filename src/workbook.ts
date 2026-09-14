@@ -1,3 +1,4 @@
+import { DEFAULT_COLUMNS, normalizeColumns, type ColumnConfig } from "./columns";
 import type { Inverter, Polaridade, TestRow, Workbook } from "./types";
 import { FILE_VERSION } from "./types";
 
@@ -27,8 +28,8 @@ export function emptyRow(overrides: Partial<TestRow> = {}): TestRow {
     polaridade: "",
     flutPositivo: "",
     flutNegativo: "",
-    tensaoAplicada: "1kV",
-    isolamentoTempo: "60s",
+    tensaoAplicada: "",
+    isolamentoTempo: "",
     isolamentoMohm: "",
     isolamentoGohm: "",
     ...overrides,
@@ -54,42 +55,29 @@ export function createEmptyWorkbook(): Workbook {
     temperatura: "",
     tecnico: "",
     observacoes: "",
+    columns: { ...DEFAULT_COLUMNS },
     inverters,
     activeInverterId: inverters[0].id,
   };
 }
 
 export function addMesa(inverter: Inverter, mesaLabel: string, strings = 2): Inverter {
-  const label = mesaLabel.trim() || nextMesaLabel(inverter);
-  const startPv = nextNumber(inverter.rows.map((r) => r.pv));
-  const startMppt = nextNumber(inverter.rows.map((r) => r.mppt));
+  const count = Math.max(1, Math.min(50, Math.trunc(Number(strings)) || 2));
   const rows = [...inverter.rows];
-  for (let i = 0; i < strings; i += 1) {
-    rows.push(
-      emptyRow({
-        mesa: label,
-        stringNo: String(i + 1),
-        pv: String(startPv + i),
-        mppt: String(startMppt),
-      }),
-    );
+  for (let i = 0; i < count; i += 1) {
+    rows.push(emptyRow({ mesa: mesaLabel.trim() }));
   }
   return { ...inverter, rows };
 }
 
-export function addString(inverter: Inverter): Inverter {
+export function addString(inverter: Inverter, copyMesa = true): Inverter {
   const last = inverter.rows[inverter.rows.length - 1];
-  const mesa = last?.mesa ?? nextMesaLabel(inverter);
-  const stringNo = last ? String(Number(last.stringNo || "0") + 1) : "1";
   return {
     ...inverter,
     rows: [
       ...inverter.rows,
       emptyRow({
-        mesa,
-        stringNo,
-        pv: String(nextNumber(inverter.rows.map((r) => r.pv))),
-        mppt: last?.mppt ?? "",
+        mesa: copyMesa ? last?.mesa ?? "" : "",
       }),
     ],
   };
@@ -155,6 +143,7 @@ export function parseWorkbook(raw: string): Workbook {
     temperatura: String(data.temperatura ?? ""),
     tecnico: String(data.tecnico ?? ""),
     observacoes: String(data.observacoes ?? ""),
+    columns: normalizeColumns(data.columns as Partial<ColumnConfig> | undefined),
     inverters,
     activeInverterId: active,
   };
@@ -260,24 +249,11 @@ function normalizeRow(input: Partial<TestRow>): TestRow {
     polaridade: polaridade as Polaridade,
     flutPositivo: String(input.flutPositivo ?? ""),
     flutNegativo: String(input.flutNegativo ?? ""),
-    tensaoAplicada: String(input.tensaoAplicada ?? "1kV"),
-    isolamentoTempo: String(input.isolamentoTempo ?? "60s"),
+    tensaoAplicada: String(input.tensaoAplicada ?? ""),
+    isolamentoTempo: String(input.isolamentoTempo ?? ""),
     isolamentoMohm: String(input.isolamentoMohm ?? ""),
     isolamentoGohm: String(input.isolamentoGohm ?? ""),
   });
-}
-
-function nextMesaLabel(inverter: Inverter): string {
-  const numbers = inverter.rows
-    .map((row) => Number((row.mesa.match(/\d+/) || [])[0]))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  const next = numbers.length ? Math.max(...numbers) + 1 : 1;
-  return `Mesa ${String(next).padStart(2, "0")}`;
-}
-
-function nextNumber(values: string[]): number {
-  const numbers = values.map((value) => Number(value)).filter((n) => Number.isFinite(n) && n > 0);
-  return numbers.length ? Math.max(...numbers) + 1 : 1;
 }
 
 function row(

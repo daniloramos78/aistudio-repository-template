@@ -1,5 +1,14 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  GROUP_LABEL,
+  groupSpan,
+  normalizeColumns,
+  rowValue,
+  visibleColumns,
+  type ColumnConfig,
+  type ColumnGroup,
+} from "./columns";
 import type { Workbook } from "./types";
 import dejaVuBold from "./fonts/DejaVuSansOhm-Bold.ttf?inline";
 import dejaVuRegular from "./fonts/DejaVuSansOhm.ttf?inline";
@@ -30,6 +39,8 @@ function fmtDate(iso: string): string {
 export function buildPdf(workbook: Workbook): Uint8Array {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   registerOhmFont(doc);
+  const columns = normalizeColumns(workbook.columns);
+  const vis = visibleColumns(columns);
   const margin = 10;
 
   workbook.inverters.forEach((inverter, index) => {
@@ -70,62 +81,29 @@ export function buildPdf(workbook: Workbook): Uint8Array {
         fontStyle: "bold",
         textColor: 20,
       },
-      head: [
-        [
-          { content: "", colSpan: 6, styles: { fillColor: [233, 236, 239] } },
-          { content: "Teste de Flutuação", colSpan: 3, styles: { fillColor: [76, 175, 80], textColor: 255 } },
-          { content: "Teste de Isolação", colSpan: 3, styles: { fillColor: [230, 126, 34], textColor: 255 } },
-        ],
-        [
-          "Mesa",
-          "String",
-          "PV",
-          "MPPT",
-          "Tensão Voc",
-          "Polaridade",
-          "Positivo + T",
-          "Negativo + T",
-          "Tensão Aplicada",
-          "Tempo",
-          "M\u03A9",
-          "G\u03A9",
-        ],
-      ],
+      head: pdfHead(columns),
       body: inverter.rows.map((row, rowIndex) => {
         const first =
           rowIndex === 0 || row.mesa.trim() !== inverter.rows[rowIndex - 1].mesa.trim();
-        return [
-          {
-            content: row.mesa,
-            styles: first
-              ? { fillColor: [255, 241, 118], fontStyle: "bold", textColor: 20 }
-              : { textColor: 90 },
-          },
-          row.stringNo,
-          row.pv,
-          row.mppt,
-          row.tensaoVoc,
-          row.polaridade,
-          row.flutPositivo,
-          row.flutNegativo,
-          row.tensaoAplicada,
-          row.isolamentoTempo,
-          row.isolamentoMohm,
-          row.isolamentoGohm,
-        ];
+        return vis.map((column) => {
+          if (column.id === "mesa") {
+            return {
+              content: row.mesa,
+              styles: first
+                ? { fillColor: [255, 241, 118], fontStyle: "bold", textColor: 20 }
+                : { textColor: 90 },
+            };
+          }
+          return rowValue(row, column.id);
+        });
       }),
-      columnStyles: {
-        0: { cellWidth: 22 },
-      },
+      columnStyles: vis[0]?.id === "mesa" ? { 0: { cellWidth: 22 } } : {},
       didParseCell: (data) => {
-        if (data.section === "head" && data.row.index === 1) {
-          if (data.column.index >= 6 && data.column.index <= 8) {
-            data.cell.styles.fillColor = [200, 230, 201];
-          }
-          if (data.column.index >= 9) {
-            data.cell.styles.fillColor = [255, 224, 178];
-          }
-        }
+        if (data.section !== "head" || data.row.index !== 1) return;
+        const column = vis[data.column.index];
+        if (!column) return;
+        if (column.group === "float") data.cell.styles.fillColor = [200, 230, 201];
+        if (column.group === "iso") data.cell.styles.fillColor = [255, 224, 178];
       },
     });
 
@@ -142,4 +120,20 @@ export function buildPdf(workbook: Workbook): Uint8Array {
 
   const output = doc.output("arraybuffer");
   return new Uint8Array(output);
+}
+
+function pdfHead(config: ColumnConfig) {
+  const groups: ColumnGroup[] = ["id", "float", "iso"];
+  const groupRow = groups.flatMap((group) => {
+    const span = groupSpan(config, group);
+    if (!span) return [];
+    const styles =
+      group === "id"
+        ? { fillColor: [233, 236, 239] as [number, number, number] }
+        : group === "float"
+          ? { fillColor: [76, 175, 80] as [number, number, number], textColor: 255 }
+          : { fillColor: [230, 126, 34] as [number, number, number], textColor: 255 };
+    return [{ content: GROUP_LABEL[group], colSpan: span, styles }];
+  });
+  return [groupRow, visibleColumns(config).map((column) => column.label)];
 }

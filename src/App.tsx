@@ -5,6 +5,19 @@ import { openWorkbookFile, savePdfFile, saveWorkbookFile } from "./platform";
 import type { Inverter, TestRow, Workbook } from "./types";
 import { DRAFT_KEY, RECENT_KEY } from "./types";
 import {
+  COLUMNS,
+  DEFAULT_COLUMNS,
+  GROUP_LABEL,
+  SMALL_PLANT_COLUMNS,
+  groupSpan,
+  normalizeColumns,
+  rowValue,
+  visibleColumns,
+  type ColumnConfig,
+  type ColumnGroup,
+  type ColumnId,
+} from "./columns";
+import {
   addMesa,
   addString,
   countMesas,
@@ -39,13 +52,21 @@ export default function App() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editNumber, setEditNumber] = useState("");
+  const [configOpen, setConfigOpen] = useState(false);
+  const [draftColumns, setDraftColumns] = useState<ColumnConfig>(DEFAULT_COLUMNS);
+  const [mesaOpen, setMesaOpen] = useState(false);
+  const [mesaName, setMesaName] = useState("");
+  const [mesaCount, setMesaCount] = useState("2");
   const [demo] = useState(() => isDemoPage());
   const snapshot = useRef(serializeWorkbook(emptyDraft));
 
   const active = book.inverters.find((inv) => inv.id === book.activeInverterId)
     ?? book.inverters[0];
 
-  const mark = useCallback((next: Workbook, message?: string) => {
+  const mark = useCallback((
+    next: Workbook | ((current: Workbook) => Workbook),
+    message?: string,
+  ) => {
     setBook(next);
     setDirty(true);
     if (message) setStatus({ kind: "ok", text: message });
@@ -199,13 +220,30 @@ export default function App() {
     });
   };
 
-  const patchHeader = (patch: Partial<Workbook>) => mark({ ...book, ...patch });
+  const patchHeader = (patch: Partial<Workbook>) => {
+    mark((current) => ({ ...current, ...patch }));
+  };
 
-  const patchActive = (inverter: Inverter, message?: string) => {
-    mark({
-      ...book,
-      inverters: book.inverters.map((item) => (item.id === inverter.id ? inverter : item)),
+  const mutateActive = (fn: (inverter: Inverter) => Inverter, message?: string) => {
+    mark((current) => {
+      const inverter =
+        current.inverters.find((item) => item.id === current.activeInverterId)
+        ?? current.inverters[0];
+      return {
+        ...current,
+        inverters: current.inverters.map((item) =>
+          item.id === inverter.id ? fn(item) : item,
+        ),
+      };
     }, message);
+  };
+
+  const submitMesa = () => {
+    mutateActive(
+      (inverter) => addMesa(inverter, mesaName, Number(mesaCount) || 2),
+      "Mesa adicionada — linhas vazias para preencher",
+    );
+    setMesaOpen(false);
   };
 
   const addInverter = () => {
@@ -254,6 +292,8 @@ export default function App() {
 
   const editing = book.inverters.find((inv) => inv.id === editId) ?? null;
 
+  const columns = book.columns ?? DEFAULT_COLUMNS;
+  const vis = visibleColumns(columns);
   const stats = useMemo(() => {
     const rows = book.inverters.flatMap((inv) => inv.rows);
     const mesas = new Set(rows.map((row) => row.mesa.trim()).filter(Boolean)).size;
@@ -289,6 +329,16 @@ export default function App() {
           <button type="button" onClick={() => void persist(true)}>Salvar como</button>
           <button type="button" onClick={() => void exportPdf()}>Salvar PDF</button>
           <button type="button" onClick={() => window.print()}>Imprimir</button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              setDraftColumns(columns);
+              setConfigOpen(true);
+            }}
+          >
+            Configuração
+          </button>
           <button type="button" className="ghost" onClick={loadExample}>
             Carregar exemplo
           </button>
@@ -375,21 +425,32 @@ export default function App() {
         <div>
           <strong>{active.name}</strong>
           <span>
-            {countMesas(active)} mesas · {active.rows.length} strings
+            {columns.mesa ? `${countMesas(active)} mesas · ` : ""}
+            {active.rows.length} strings
           </span>
         </div>
         <div className="actions">
+          {columns.mesa && (
+            <button
+              type="button"
+              onClick={() => {
+                setMesaName("");
+                setMesaCount("2");
+                setMesaOpen(true);
+              }}
+            >
+              Adicionar mesa
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => {
-              const label = window.prompt("Nome da mesa", `Mesa ${String(countMesas(active) + 1).padStart(2, "0")}`);
-              if (label === null) return;
-              patchActive(addMesa(active, label), "Mesa adicionada");
-            }}
+            onClick={() =>
+              mutateActive(
+                (inverter) => addString(inverter, columns.mesa),
+                "String vazia adicionada — clique na célula para preencher",
+              )
+            }
           >
-            Adicionar mesa
-          </button>
-          <button type="button" onClick={() => patchActive(addString(active), "String adicionada")}>
             Adicionar string
           </button>
         </div>
@@ -399,39 +460,31 @@ export default function App() {
         <table className="sheet">
           <thead>
             <tr>
-              <th colSpan={6} className="group blank">
-                Identificação
-              </th>
-              <th colSpan={3} className="group float">
-                Teste de Flutuação
-              </th>
-              <th colSpan={3} className="group iso">
-                Teste de Isolação
-              </th>
+              {(["id", "float", "iso"] as ColumnGroup[]).map((group) => {
+                const span = groupSpan(columns, group);
+                if (!span) return null;
+                return (
+                  <th key={group} colSpan={span} className={`group ${group === "id" ? "blank" : group === "float" ? "float" : "iso"}`}>
+                    {GROUP_LABEL[group]}
+                  </th>
+                );
+              })}
               <th className="no-print" />
             </tr>
             <tr>
-              <th>Mesa</th>
-              <th>String</th>
-              <th>PV</th>
-              <th>MPPT</th>
-              <th>Tensão Voc</th>
-              <th>Polaridade</th>
-              <th>Positivo + T</th>
-              <th>Negativo + T</th>
-              <th>Tensão Aplicada</th>
-              <th>Tempo</th>
-              <th>MΩ</th>
-              <th>GΩ</th>
+              {vis.map((column) => (
+                <th key={column.id}>{column.label}</th>
+              ))}
               <th className="no-print" />
             </tr>
           </thead>
           <tbody>
             {active.rows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="empty">
-                  Nenhuma linha neste inversor. Clique em <strong>Adicionar mesa</strong> para
-                  começar os testes de campo.
+                <td colSpan={vis.length + 1} className="empty">
+                  Nenhuma linha neste inversor. Clique em{" "}
+                  <strong>{columns.mesa ? "Adicionar mesa" : "Adicionar string"}</strong>{" "}
+                  para começar. As células entram vazias para você preencher no campo.
                 </td>
               </tr>
             ) : (
@@ -439,9 +492,12 @@ export default function App() {
                 <GridRow
                   key={row.id}
                   row={row}
+                  columns={vis.map((column) => column.id)}
                   first={isFirstOfMesa(active.rows, index)}
-                  onChange={(patch) => patchActive(updateRow(active, row.id, patch))}
-                  onRemove={() => patchActive(removeRow(active, row.id))}
+                  onChange={(patch) =>
+                    mutateActive((inverter) => updateRow(inverter, row.id, patch))
+                  }
+                  onRemove={() => mutateActive((inverter) => removeRow(inverter, row.id))}
                 />
               ))
             )}
@@ -529,30 +585,168 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {configOpen && (
+        <div className="modal-backdrop no-print" onClick={() => setConfigOpen(false)}>
+          <div
+            className="modal modal-wide"
+            role="dialog"
+            aria-labelledby="config-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="config-title">Configuração da planilha</h2>
+            <p className="modal-hint">
+              Por padrão todos os campos vêm ligados. Desmarque o que não usar — usina pequena pode
+              ficar sem mesa.
+            </p>
+            <div className="modal-actions" style={{ marginBottom: 12 }}>
+              <button type="button" onClick={() => setDraftColumns({ ...DEFAULT_COLUMNS })}>
+                Todos os campos
+              </button>
+              <button type="button" onClick={() => setDraftColumns({ ...SMALL_PLANT_COLUMNS })}>
+                Usina pequena (sem mesa)
+              </button>
+            </div>
+            {(["id", "float", "iso"] as ColumnGroup[]).map((group) => (
+              <fieldset key={group} className="config-group">
+                <legend>{GROUP_LABEL[group]}</legend>
+                {COLUMNS.filter((column) => column.group === group).map((column) => (
+                  <label key={column.id} className="check">
+                    <input
+                      type="checkbox"
+                      checked={draftColumns[column.id]}
+                      onChange={(e) =>
+                        setDraftColumns((current) => ({
+                          ...current,
+                          [column.id]: e.target.checked,
+                        }))
+                      }
+                    />
+                    {column.label}
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  mark(
+                    (current) => ({ ...current, columns: normalizeColumns(draftColumns) }),
+                    "Configuração da planilha atualizada",
+                  );
+                  setConfigOpen(false);
+                }}
+              >
+                Aplicar
+              </button>
+              <button type="button" onClick={() => setConfigOpen(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mesaOpen && (
+        <div className="modal-backdrop no-print" onClick={() => setMesaOpen(false)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-labelledby="mesa-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="mesa-title">Adicionar mesa</h2>
+            <p className="modal-hint">As linhas entram vazias. Preencha os valores no campo.</p>
+            <label>
+              Nome da mesa (opcional)
+              <input
+                autoFocus
+                value={mesaName}
+                placeholder="Ex.: Mesa 01"
+                onChange={(e) => setMesaName(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitMesa();
+                  }
+                }}
+              />
+            </label>
+            <label>
+              Quantidade de strings
+              <input
+                inputMode="numeric"
+                value={mesaCount}
+                onChange={(e) => setMesaCount(e.target.value.replaceAll(/\D+/g, ""))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitMesa();
+                  }
+                }}
+              />
+            </label>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={submitMesa}
+              >
+                Adicionar
+              </button>
+              <button type="button" onClick={() => setMesaOpen(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function GridRow({
   row,
+  columns,
   first,
   onChange,
   onRemove,
 }: {
   row: TestRow;
+  columns: ColumnId[];
   first: boolean;
   onChange: (patch: Partial<TestRow>) => void;
   onRemove: () => void;
 }) {
   return (
     <tr>
-      <td className={first ? "mesa" : "mesa muted"}>
-        <input value={row.mesa} onChange={(e) => onChange({ mesa: e.target.value })} />
+      {columns.map((id) => (
+        <GridCell key={id} id={id} row={row} first={first} onChange={onChange} />
+      ))}
+      <td className="no-print">
+        <button type="button" className="row-x" onClick={onRemove} title="Excluir linha">
+          ×
+        </button>
       </td>
-      <Cell value={row.stringNo} onChange={(stringNo) => onChange({ stringNo })} />
-      <Cell value={row.pv} onChange={(pv) => onChange({ pv })} />
-      <Cell value={row.mppt} onChange={(mppt) => onChange({ mppt })} />
-      <Cell value={row.tensaoVoc} onChange={(tensaoVoc) => onChange({ tensaoVoc })} />
+    </tr>
+  );
+}
+
+function GridCell({
+  id,
+  row,
+  first,
+  onChange,
+}: {
+  id: ColumnId;
+  row: TestRow;
+  first: boolean;
+  onChange: (patch: Partial<TestRow>) => void;
+}) {
+  if (id === "polaridade") {
+    return (
       <td>
         <select
           value={row.polaridade}
@@ -563,31 +757,18 @@ function GridRow({
           <option value="Nok">Nok</option>
         </select>
       </td>
-      <Cell value={row.flutPositivo} onChange={(flutPositivo) => onChange({ flutPositivo })} />
-      <Cell value={row.flutNegativo} onChange={(flutNegativo) => onChange({ flutNegativo })} />
-      <Cell value={row.tensaoAplicada} onChange={(tensaoAplicada) => onChange({ tensaoAplicada })} />
-      <Cell value={row.isolamentoTempo} onChange={(isolamentoTempo) => onChange({ isolamentoTempo })} />
-      <Cell value={row.isolamentoMohm} onChange={(isolamentoMohm) => onChange({ isolamentoMohm })} />
-      <Cell value={row.isolamentoGohm} onChange={(isolamentoGohm) => onChange({ isolamentoGohm })} />
-      <td className="no-print">
-        <button type="button" className="row-x" onClick={onRemove} title="Excluir linha">
-          ×
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-function Cell({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
+    );
+  }
+  const className = id === "mesa" ? (first ? "mesa" : "mesa muted") : undefined;
   return (
-    <td>
-      <input value={value} onChange={(e) => onChange(e.target.value)} />
+    <td className={className}>
+      <input
+        value={rowValue(row, id)}
+        autoComplete="off"
+        spellCheck={false}
+        aria-label={id}
+        onChange={(e) => onChange({ [id]: e.target.value } as Partial<TestRow>)}
+      />
     </td>
   );
 }

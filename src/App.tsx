@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isDemoPage } from "./demo";
 import { buildPdf } from "./pdf";
 import { openWorkbookFile, savePdfFile, saveWorkbookFile } from "./platform";
 import type { Inverter, TestRow, Workbook } from "./types";
@@ -33,6 +34,7 @@ export default function App() {
   });
   const [recent, setRecent] = useState<string[]>([]);
   const [renameId, setRenameId] = useState<string | null>(null);
+  const [demo] = useState(() => isDemoPage());
   const snapshot = useRef(serializeWorkbook(emptyDraft));
 
   const active = book.inverters.find((inv) => inv.id === book.activeInverterId)
@@ -53,6 +55,17 @@ export default function App() {
         /* ignore */
       }
     }
+    if (isDemoPage()) {
+      const next = createExampleWorkbook();
+      snapshot.current = serializeWorkbook(next);
+      setBook(next);
+      setDirty(false);
+      setStatus({
+        kind: "ok",
+        text: "Página de teste — exemplo Manga G. 05. Pode editar, salvar JSON e gerar PDF.",
+      });
+      return;
+    }
     const draft = window.localStorage.getItem(DRAFT_KEY);
     if (!draft) return;
     try {
@@ -69,11 +82,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (demo) return;
     const handle = window.setTimeout(() => {
       window.localStorage.setItem(DRAFT_KEY, serializeWorkbook(book));
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [book]);
+  }, [book, demo]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -221,7 +235,13 @@ export default function App() {
   }, [book]);
 
   return (
-    <div className="app">
+    <div className={demo ? "app demo" : "app"}>
+      {demo && (
+        <div className="demo-banner no-print">
+          Página de teste com dados de exemplo (UFV Manga G. 05). Edite à vontade — nada é enviado
+          para servidor.
+        </div>
+      )}
       <header className="toolbar no-print">
         <div className="brand">
           <span className="logo" aria-hidden="true">

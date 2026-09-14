@@ -42,14 +42,16 @@ npm run dist:win
 
 O instalador e a versão portátil (sem instalação) saem em `release/`.
 
-Para só usar no navegador, sem instalador:
+## Página de teste no navegador
+
+Abra `teste.html` (ou `index.html?demo=1`). A planilha já vem preenchida com o exemplo Manga G. 05.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abra `http://127.0.0.1:5173`. **Salvar** baixa o `.ufv.json`; **Salvar PDF** baixa o PDF.
+Depois acesse `http://127.0.0.1:5173/teste.html`. **Salvar** baixa o `.ufv.json`; **Salvar PDF** baixa o PDF.
 
 ## Arquivo de dados
 

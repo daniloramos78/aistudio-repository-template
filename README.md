@@ -4,15 +4,29 @@ Aplicativo para preencher, no computador, a planilha de testes de campo de usina
 
 O modelo segue a planilha `Planilha de Testes.ods` (abas `INVERSOR_01` … `INVERSOR_04`, UFV, data, umidade e temperatura).
 
-## No Windows, depois de instalar
+## No Windows
 
-1. Execute o instalador `Planilha de Testes UFV Setup.exe`.
-2. Abra o atalho **Planilha de Testes UFV** na área de trabalho.
-3. Preencha data, umidade, temperatura e o nome da UFV.
-4. Em cada aba de inversor, use **Adicionar mesa** (cria duas strings) ou **Adicionar string**.
-5. Clique em **Salvar**. O arquivo `.ufv.json` fica na pasta que você escolher (Documentos, pen drive, etc.).
-6. **Salvar PDF** ou **Imprimir** gera o relatório.
-7. **Novo** começa outro teste. **Abrir** recupera um teste antigo.
+Há um executável **portátil** (`Planilha de Testes UFV 1.0.0.exe`): copie para o PC (pasta, pen drive ou área de trabalho) e abra com dois cliques. Não precisa instalar nada.
+
+Para gerar o **instalador** com atalho no menu Iniciar e na área de trabalho, no próprio Windows:
+
+```bash
+npm install
+npm run dist:win
+```
+
+Os arquivos saem na pasta `release/`:
+
+- `Planilha de Testes UFV Setup 1.0.0.exe` — instalador
+- `Planilha de Testes UFV 1.0.0.exe` — portátil
+
+Depois de abrir o app:
+
+1. Preencha data, umidade, temperatura e o nome da UFV.
+2. Em cada aba de inversor, use **Adicionar mesa** (cria duas strings) ou **Adicionar string**.
+3. Clique em **Salvar**. O arquivo `.ufv.json` fica na pasta que você escolher.
+4. **Salvar PDF** ou **Imprimir** gera o relatório.
+5. **Novo** começa outro teste. **Abrir** recupera um teste antigo.
 
 Atalhos: `Ctrl+S` salvar, `Ctrl+Shift+S` salvar como, `Ctrl+O` abrir, `Ctrl+N` novo, `Ctrl+P` imprimir.
 

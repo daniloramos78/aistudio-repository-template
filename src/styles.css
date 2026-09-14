@@ -91,7 +91,7 @@ button, input, select {
 .actions button,
 .sheet-toolbar button,
 .tab.add,
-.tab-x,
+.tab-edit,
 .row-x {
   border: 0;
   border-radius: 6px;
@@ -173,19 +173,95 @@ button, input, select {
   color: var(--ink);
 }
 
-.tab-x, .row-x {
-  padding: 0 8px;
+.tab-edit, .row-x {
+  padding: 0 10px;
   background: transparent;
-  color: var(--muted);
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .tab.add {
   background: #cfc8b6;
 }
 
-.tab-rename {
-  margin: 6px;
-  width: 140px;
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 54, 40, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  padding: 16px;
+}
+
+.modal {
+  width: min(440px, 100%);
+  background: #fffdf7;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.modal-hint,
+.modal-preview {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.modal input {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.modal-actions button {
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #e8e2d2;
+  color: var(--forest);
+  cursor: pointer;
+}
+
+.modal-actions .primary {
+  background: var(--accent);
+  font-weight: 700;
+}
+
+.modal-actions .danger {
+  background: #9b2c2c;
+  color: #fff;
+  margin-left: auto;
 }
 
 .sheet-toolbar {

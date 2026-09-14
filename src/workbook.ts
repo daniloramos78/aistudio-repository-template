@@ -178,6 +178,40 @@ export function countMesas(inverter: Inverter): number {
   return new Set(inverter.rows.map((row) => row.mesa.trim()).filter(Boolean)).size;
 }
 
+export function inverterHasData(inverter: Inverter): boolean {
+  return inverter.rows.some((row) => {
+    if (
+      row.mesa.trim() ||
+      row.stringNo.trim() ||
+      row.pv.trim() ||
+      row.mppt.trim() ||
+      row.tensaoVoc.trim() ||
+      row.polaridade ||
+      row.flutPositivo.trim() ||
+      row.flutNegativo.trim() ||
+      row.isolamentoMohm.trim() ||
+      row.isolamentoGohm.trim()
+    ) {
+      return true;
+    }
+    if (row.tensaoAplicada.trim() && row.tensaoAplicada.trim() !== "1kV") return true;
+    if (row.isolamentoTempo.trim() && row.isolamentoTempo.trim() !== "60s") return true;
+    return false;
+  });
+}
+
+export function inverterNumberFromName(name: string): string {
+  const match = name.match(/(\d+)\s*$/);
+  if (!match) return "";
+  return String(Number(match[1])).padStart(2, "0");
+}
+
+export function inverterNameFromNumber(raw: string): string {
+  const n = Number(String(raw).replaceAll(/\D+/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return "INVERSOR_01";
+  return `INVERSOR_${String(Math.trunc(n)).padStart(2, "0")}`;
+}
+
 export function createExampleWorkbook(): Workbook {
   const book = createEmptyWorkbook();
   const inv1 = {

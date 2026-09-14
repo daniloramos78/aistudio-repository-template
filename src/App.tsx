@@ -12,6 +12,9 @@ import {
   createExampleWorkbook,
   emptyInverter,
   fileTitle,
+  inverterHasData,
+  inverterNameFromNumber,
+  inverterNumberFromName,
   isFirstOfMesa,
   parseWorkbook,
   removeRow,
@@ -33,7 +36,9 @@ export default function App() {
     text: "Novo teste. Os dados ficam neste computador.",
   });
   const [recent, setRecent] = useState<string[]>([]);
-  const [renameId, setRenameId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editNumber, setEditNumber] = useState("");
   const [demo] = useState(() => isDemoPage());
   const snapshot = useRef(serializeWorkbook(emptyDraft));
 
@@ -215,16 +220,39 @@ export default function App() {
   const removeInverter = (id: string) => {
     if (book.inverters.length === 1) {
       setStatus({ kind: "warn", text: "Mantenha pelo menos um inversor." });
-      return;
+      return false;
     }
-    if (!window.confirm("Excluir este inversor e todas as linhas?")) return;
+    if (!window.confirm("Excluir este inversor e todas as linhas?")) return false;
     const inverters = book.inverters.filter((item) => item.id !== id);
     mark({
       ...book,
       inverters,
       activeInverterId: book.activeInverterId === id ? inverters[0].id : book.activeInverterId,
     }, "Inversor excluído");
+    return true;
   };
+
+  const openInverterEditor = (inv: Inverter) => {
+    if (!inverterHasData(inv)) return;
+    setBook((current) => ({ ...current, activeInverterId: inv.id }));
+    setEditId(inv.id);
+    setEditName(inv.name);
+    setEditNumber(inverterNumberFromName(inv.name));
+  };
+
+  const saveInverterEditor = () => {
+    if (!editId) return;
+    const name = editName.trim() || inverterNameFromNumber(editNumber);
+    mark({
+      ...book,
+      inverters: book.inverters.map((item) =>
+        item.id === editId ? { ...item, name } : item,
+      ),
+    }, `${name} atualizado`);
+    setEditId(null);
+  };
+
+  const editing = book.inverters.find((inv) => inv.id === editId) ?? null;
 
   const stats = useMemo(() => {
     const rows = book.inverters.flatMap((inv) => inv.rows);
@@ -321,41 +349,21 @@ export default function App() {
       <nav className="tabs no-print">
         {book.inverters.map((inv) => (
           <div key={inv.id} className={inv.id === active.id ? "tab active" : "tab"}>
-            {renameId === inv.id ? (
-              <input
-                autoFocus
-                className="tab-rename"
-                value={inv.name}
-                onChange={(e) =>
-                  mark({
-                    ...book,
-                    inverters: book.inverters.map((item) =>
-                      item.id === inv.id ? { ...item, name: e.target.value } : item,
-                    ),
-                  })
-                }
-                onBlur={() => setRenameId(null)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") setRenameId(null);
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => mark({ ...book, activeInverterId: inv.id })}
-                onDoubleClick={() => setRenameId(inv.id)}
-              >
-                {inv.name}
-              </button>
-            )}
             <button
               type="button"
-              className="tab-x"
-              title="Excluir inversor"
-              onClick={() => removeInverter(inv.id)}
+              onClick={() => mark({ ...book, activeInverterId: inv.id })}
             >
-              ×
+              {inv.name}
             </button>
+            {inverterHasData(inv) && (
+              <button
+                type="button"
+                className="tab-edit"
+                onClick={() => openInverterEditor(inv)}
+              >
+                Editar
+              </button>
+            )}
           </div>
         ))}
         <button type="button" className="tab add" onClick={addInverter}>
@@ -462,6 +470,65 @@ export default function App() {
           {book.ufv || "UFV não informada"} · {fileTitle(book)}
         </p>
       </section>
+
+      {editing && (
+        <div className="modal-backdrop no-print" onClick={() => setEditId(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-labelledby="edit-inverter-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="edit-inverter-title">Editar {editing.name}</h2>
+            <p className="modal-hint">
+              Disponível porque este inversor já tem dados preenchidos.
+            </p>
+            <label>
+              Editar valores (nome)
+              <input
+                autoFocus
+                value={editName}
+                onChange={(e) => {
+                  setEditName(e.target.value);
+                  const parsed = inverterNumberFromName(e.target.value);
+                  if (parsed) setEditNumber(parsed);
+                }}
+              />
+            </label>
+            <label>
+              Alterar numeração
+              <input
+                inputMode="numeric"
+                value={editNumber}
+                placeholder="01"
+                onChange={(e) => {
+                  const value = e.target.value.replaceAll(/\D+/g, "");
+                  setEditNumber(value);
+                  if (value) setEditName(inverterNameFromNumber(value));
+                }}
+              />
+            </label>
+            <p className="modal-preview">Vai ficar: {editName || inverterNameFromNumber(editNumber)}</p>
+            <div className="modal-actions">
+              <button type="button" className="primary" onClick={saveInverterEditor}>
+                Salvar
+              </button>
+              <button type="button" onClick={() => setEditId(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => {
+                  if (removeInverter(editing.id)) setEditId(null);
+                }}
+              >
+                Excluir inversor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

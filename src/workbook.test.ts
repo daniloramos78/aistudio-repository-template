@@ -3,6 +3,9 @@ import {
   addMesa,
   createEmptyWorkbook,
   createExampleWorkbook,
+  inverterHasData,
+  inverterNameFromNumber,
+  inverterNumberFromName,
   isFirstOfMesa,
   parseWorkbook,
   serializeWorkbook,
@@ -41,5 +44,17 @@ describe("workbook", () => {
 
   it("rejects invalid files", () => {
     expect(() => parseWorkbook("[]")).toThrow(/inválido/i);
+  });
+
+  it("enables inverter edit only after field data exists", () => {
+    const empty = createEmptyWorkbook().inverters[0];
+    expect(inverterHasData(empty)).toBe(false);
+    expect(inverterHasData(addMesa(empty, "Mesa 01"))).toBe(true);
+    expect(inverterHasData(createExampleWorkbook().inverters[2])).toBe(false);
+  });
+
+  it("formats inverter numbering", () => {
+    expect(inverterNumberFromName("INVERSOR_04")).toBe("04");
+    expect(inverterNameFromNumber("7")).toBe("INVERSOR_07");
   });
 });

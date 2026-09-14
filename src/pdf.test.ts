@@ -7,5 +7,8 @@ describe("pdf", () => {
     const bytes = buildPdf(createExampleWorkbook());
     expect(bytes.byteLength).toBeGreaterThan(1000);
     expect(String.fromCharCode(...bytes.slice(0, 5))).toBe("%PDF-");
+    const asLatin = Buffer.from(bytes).toString("latin1");
+    expect(asLatin).toContain("DejaVu");
+    expect(asLatin).not.toMatch(/M\s*©/);
   });
 });

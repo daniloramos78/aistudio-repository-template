@@ -1,6 +1,24 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Workbook } from "./types";
+import dejaVuBold from "./fonts/DejaVuSansOhm-Bold.ttf?inline";
+import dejaVuRegular from "./fonts/DejaVuSansOhm.ttf?inline";
+
+const FONT = "DejaVu";
+
+function ttfBase64(dataUrl: string): string {
+  const marker = "base64,";
+  const index = dataUrl.indexOf(marker);
+  return index >= 0 ? dataUrl.slice(index + marker.length) : dataUrl;
+}
+
+function registerOhmFont(doc: jsPDF) {
+  doc.addFileToVFS("DejaVuSansOhm.ttf", ttfBase64(dejaVuRegular));
+  doc.addFileToVFS("DejaVuSansOhm-Bold.ttf", ttfBase64(dejaVuBold));
+  doc.addFont("DejaVuSansOhm.ttf", FONT, "normal");
+  doc.addFont("DejaVuSansOhm-Bold.ttf", FONT, "bold");
+  doc.setFont(FONT, "normal");
+}
 
 function fmtDate(iso: string): string {
   if (!iso) return "";
@@ -11,16 +29,17 @@ function fmtDate(iso: string): string {
 
 export function buildPdf(workbook: Workbook): Uint8Array {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  registerOhmFont(doc);
   const margin = 10;
 
   workbook.inverters.forEach((inverter, index) => {
     if (index > 0) doc.addPage();
 
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT, "bold");
     doc.setFontSize(14);
     doc.text("Planilha de Testes UFV", margin, 12);
 
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT, "normal");
     doc.setFontSize(10);
     doc.text(`UFV: ${workbook.ufv || "—"}`, margin, 19);
     doc.text(`Data: ${fmtDate(workbook.data) || "—"}`, 80, 19);
@@ -39,14 +58,17 @@ export function buildPdf(workbook: Workbook): Uint8Array {
       startY: workbook.tecnico || workbook.observacoes ? 29 : 28,
       theme: "grid",
       styles: {
+        font: FONT,
+        fontStyle: "normal",
         fontSize: 7.5,
         cellPadding: 1.2,
         halign: "center",
         valign: "middle",
       },
       headStyles: {
-        textColor: 20,
+        font: FONT,
         fontStyle: "bold",
+        textColor: 20,
       },
       head: [
         [
@@ -65,8 +87,8 @@ export function buildPdf(workbook: Workbook): Uint8Array {
           "Negativo + T",
           "Tensão Aplicada",
           "Tempo",
-          "MΩ",
-          "GΩ",
+          "M\u03A9",
+          "G\u03A9",
         ],
       ],
       body: inverter.rows.map((row, rowIndex) => {
@@ -107,8 +129,8 @@ export function buildPdf(workbook: Workbook): Uint8Array {
       },
     });
 
-    const pages = doc.getNumberOfPages();
     doc.setPage(index + 1);
+    doc.setFont(FONT, "normal");
     doc.setFontSize(8);
     doc.setTextColor(90);
     doc.text(
@@ -116,7 +138,6 @@ export function buildPdf(workbook: Workbook): Uint8Array {
       margin,
       200,
     );
-    void pages;
   });
 
   const output = doc.output("arraybuffer");

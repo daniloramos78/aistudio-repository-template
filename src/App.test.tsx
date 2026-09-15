@@ -22,6 +22,14 @@ function typeInto(input: HTMLInputElement, value: string) {
   });
 }
 
+function fillCell(host: HTMLElement, label: string, value: string) {
+  const input = () => host.querySelector(`[aria-label="${label}"]`) as HTMLInputElement;
+  typeInto(input(), value);
+  act(() => {
+    input().blur();
+  });
+}
+
 describe("App grid", () => {
   let root: Root;
   let host: HTMLDivElement;
@@ -121,6 +129,96 @@ describe("App grid", () => {
     expect(mesa.value).toBe("Mesa 07");
     const stringNo = host.querySelector('[aria-label="stringNo"]') as HTMLInputElement;
     expect(stringNo.value).toBe("");
+  });
+
+  it("starts a new sheet with empty criteria, isolation options and no TΩ column", () => {
+    expect(host.textContent).toContain("Voc esperada da string");
+    expect(host.textContent).toContain("Erro ± (%)");
+    expect(host.textContent).toContain("Tensão do módulo");
+    expect(host.textContent).toContain("Endereço");
+    const criteria = Array.from(host.querySelectorAll(".criteria input")) as HTMLInputElement[];
+    expect(criteria.map((input) => input.value)).toEqual(["", "", ""]);
+    const isolation = host.querySelector(".criteria select") as HTMLSelectElement;
+    expect(isolation.value).toBe("nbr5410");
+    expect(isolation.textContent).toMatch(/NBR 16690/);
+    expect(isolation.textContent).toMatch(/SELV\/PELV/);
+    const headers = Array.from(host.querySelectorAll(".sheet thead tr:last-child th")).map(
+      (th) => th.textContent,
+    );
+    expect(headers).not.toContain("TΩ");
+    expect(headers).toContain("Tensão Aplicada");
+    expect(headers).toContain("Tempo");
+    expect(headers).toContain("Aprov.");
+    const groups = Array.from(host.querySelectorAll(".sheet thead .group")).map((th) => th.textContent);
+    expect(groups).toContain("Teste de Isolação");
+    expect(groups).toContain("Resultado");
+  });
+
+  it("hides tempo and ohm columns when tensão aplicada is unchecked", () => {
+    const config = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Configuração",
+    );
+    click(config!);
+    const tensaoLabel = Array.from(host.querySelectorAll(".modal label.check")).find((label) =>
+      label.textContent?.includes("Tensão Aplicada"),
+    );
+    click(tensaoLabel!.querySelector("input")!);
+    const tempo = Array.from(host.querySelectorAll(".modal label.check")).find((label) =>
+      label.textContent?.trim() === "Tempo",
+    )?.querySelector("input") as HTMLInputElement;
+    expect(tempo.checked).toBe(false);
+    const apply = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Aplicar",
+    );
+    click(apply!);
+    const headers = Array.from(host.querySelectorAll(".sheet thead tr:last-child th")).map(
+      (th) => th.textContent,
+    );
+    expect(headers).not.toContain("Tensão Aplicada");
+    expect(headers).not.toContain("Tempo");
+    expect(headers).not.toContain("MΩ");
+    expect(headers).toContain("Positivo + T");
+  });
+
+  it("copies tensão aplicada and tempo onto the next string", () => {
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    fillCell(host, "tensaoAplicada", "1kV");
+    fillCell(host, "isolamentoTempo", "60s");
+    click(addString!);
+    const tensoes = Array.from(host.querySelectorAll('[aria-label="tensaoAplicada"]')) as HTMLInputElement[];
+    const tempos = Array.from(host.querySelectorAll('[aria-label="isolamentoTempo"]')) as HTMLInputElement[];
+    expect(tensoes).toHaveLength(2);
+    expect(tensoes[1].value).toBe("1kV");
+    expect(tempos[1].value).toBe("60s");
+    expect((host.querySelectorAll('[aria-label="tensaoVoc"]')[1] as HTMLInputElement).value).toBe("");
+  });
+
+  it("fails the row if only one floating pole stays below the module voltage", () => {
+    const [voc, erro, modulo] = Array.from(host.querySelectorAll(".criteria input")) as HTMLInputElement[];
+    typeInto(voc, "1000");
+    typeInto(erro, "5");
+    typeInto(modulo, "46,7");
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    fillCell(host, "tensaoVoc", "1000");
+    act(() => {
+      const polarity = host.querySelector('[aria-label="polaridade"]') as HTMLSelectElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setter?.call(polarity, "Ok");
+      polarity.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    fillCell(host, "flutPositivo", "45,9V");
+    fillCell(host, "flutNegativo", "48");
+    fillCell(host, "isolamentoMohm", "1,2");
+    expect(host.querySelector('[aria-label="Reprovado"]')).toBeTruthy();
+
+    fillCell(host, "flutNegativo", "45,2");
+    expect(host.querySelector('[aria-label="Aprovado"]')).toBeTruthy();
   });
 
   it("hides the mesa column from Configuração", () => {

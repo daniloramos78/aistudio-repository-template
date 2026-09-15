@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isDemoPage } from "./demo";
 import { buildPdf } from "./pdf";
 import { openWorkbookFile, savePdfFile, saveWorkbookFile } from "./platform";
+import FieldInput from "./FieldInput";
 import SheetGrid from "./SheetGrid";
 import { isRedoKey, isUndoKey } from "./sheetKeys";
 import type { Inverter, IsolationCriterion, TestRow, Workbook } from "./types";
@@ -155,7 +156,7 @@ export default function App() {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const inModal = Boolean(target?.closest(".modal"));
-      const inHeader = Boolean(target?.closest(".meta"));
+      const inHeader = Boolean(target?.closest(".meta, .criteria, .sheet-toolbar"));
       const inSheet = Boolean(target?.closest("[data-sheet-cell]"));
 
       if (isUndoKey(event) && !inModal && !inHeader) {
@@ -452,50 +453,50 @@ export default function App() {
         </label>
         <label>
           Umidade (%)
-          <input
+          <FieldInput
             value={book.umidade}
             inputMode="decimal"
             placeholder="40.00"
-            onChange={(e) => patchHeader({ umidade: e.target.value })}
+            onChange={(value) => patchHeader({ umidade: value })}
           />
         </label>
         <label>
           Temperatura (°C)
-          <input
+          <FieldInput
             value={book.temperatura}
             inputMode="decimal"
             placeholder="33"
-            onChange={(e) => patchHeader({ temperatura: e.target.value })}
+            onChange={(value) => patchHeader({ temperatura: value })}
           />
         </label>
         <label className="wide">
           UFV
-          <input
+          <FieldInput
             value={book.ufv}
             placeholder="Ex.: Manga G. 05"
-            onChange={(e) => patchHeader({ ufv: e.target.value })}
+            onChange={(value) => patchHeader({ ufv: value })}
           />
         </label>
         <label className="wide">
           Endereço
-          <input
+          <FieldInput
             value={book.endereco}
             placeholder="Usina, talhão, coordenadas…"
-            onChange={(e) => patchHeader({ endereco: e.target.value })}
+            onChange={(value) => patchHeader({ endereco: value })}
           />
         </label>
         <label>
           Técnico
-          <input
+          <FieldInput
             value={book.tecnico}
-            onChange={(e) => patchHeader({ tecnico: e.target.value })}
+            onChange={(value) => patchHeader({ tecnico: value })}
           />
         </label>
         <label className="wide">
           Observações
-          <input
+          <FieldInput
             value={book.observacoes}
-            onChange={(e) => patchHeader({ observacoes: e.target.value })}
+            onChange={(value) => patchHeader({ observacoes: value })}
           />
         </label>
       </section>
@@ -536,27 +537,27 @@ export default function App() {
         <div className="criteria">
           <label>
             Voc esperada da string
-            <input
+            <FieldInput
               value={book.vocEsperada}
               placeholder="Ex.: 1000"
-              onChange={(e) => patchHeader({ vocEsperada: e.target.value })}
+              onChange={(value) => patchHeader({ vocEsperada: value })}
             />
           </label>
           <label>
             Erro ± (%)
-            <input
+            <FieldInput
               value={book.erroPercentual}
               placeholder="Ex.: 5"
               inputMode="decimal"
-              onChange={(e) => patchHeader({ erroPercentual: e.target.value })}
+              onChange={(value) => patchHeader({ erroPercentual: value })}
             />
           </label>
           <label>
             Tensão do módulo
-            <input
+            <FieldInput
               value={book.tensaoModulo}
               placeholder="Ex.: 45,6V"
-              onChange={(e) => patchHeader({ tensaoModulo: e.target.value })}
+              onChange={(value) => patchHeader({ tensaoModulo: value })}
             />
           </label>
           <label>

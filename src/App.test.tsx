@@ -74,6 +74,24 @@ describe("App grid", () => {
     expect((host.querySelector('[aria-label="tensaoVoc"]') as HTMLInputElement).value).toBe("1002V");
   });
 
+  it("keeps typed header and cell text while the rest of the sheet re-renders", () => {
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    const vocHeader = Array.from(host.querySelectorAll(".criteria input"))[0] as HTMLInputElement;
+    typeInto(vocHeader, "1000");
+    expect(vocHeader.value).toBe("1000");
+    const sheetVoc = host.querySelector('[aria-label="tensaoVoc"]') as HTMLInputElement;
+    typeInto(sheetVoc, "1002V");
+    expect(sheetVoc.value).toBe("1002V");
+    const erro = Array.from(host.querySelectorAll(".criteria input"))[1] as HTMLInputElement;
+    typeInto(erro, "5");
+    expect(vocHeader.value).toBe("1000");
+    expect(erro.value).toBe("5");
+    expect((host.querySelector('[aria-label="tensaoVoc"]') as HTMLInputElement).value).toBe("1002V");
+  });
+
   it("moves to the cell below with Enter and undoes the value with Ctrl+Z", () => {
     const addString = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Adicionar string",

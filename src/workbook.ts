@@ -229,7 +229,7 @@ export function inverterHasData(inverter: Inverter): boolean {
       row.flutNegativo.trim() ||
       row.isolamentoMohm.trim() ||
       row.isolamentoGohm.trim() ||
-      row.isolamentoTohm.trim()
+      row.isolamentoTohm?.trim()
     ) {
       return true;
     }

@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -138,17 +137,30 @@ function SheetCell({
   committedRef.current = committed;
   const textRef = useRef(text);
   textRef.current = text;
+  const focusedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
-  useEffect(() => {
-    if (document.activeElement === inputRef.current) return;
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (focusedRef.current || document.activeElement === el) return;
+    if (el.value !== committed) el.value = committed;
     setText(committed);
   }, [committed]);
 
   useLayoutEffect(() => {
     if (!active) return;
     const el = inputRef.current;
-    if (!el || document.activeElement === el) return;
+    if (!el) return;
+    const current = document.activeElement;
+    if (current === el) return;
+    if (
+      current instanceof HTMLInputElement
+      || current instanceof HTMLSelectElement
+      || current instanceof HTMLTextAreaElement
+    ) {
+      if (current.closest(".meta, .criteria, .modal, .toolbar")) return;
+    }
     el.focus();
     if (el instanceof HTMLInputElement) el.select();
   }, [active, rowIndex, colIndex]);
@@ -213,7 +225,13 @@ function SheetCell({
           data-sheet-cell="1"
           aria-label={columnId}
           value={text}
-          onFocus={onActivate}
+          onFocus={() => {
+            focusedRef.current = true;
+            onActivate();
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+          }}
           onChange={(event) => {
             const value = event.target.value as Polaridade;
             setText(value);
@@ -242,15 +260,25 @@ function SheetCell({
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        value={text}
-        onFocus={onActivate}
-        onChange={(event) => setText(event.target.value)}
+        defaultValue={committed}
+        onFocus={() => {
+          focusedRef.current = true;
+          onActivate();
+        }}
         onInput={(event) => {
           const value = (event.target as HTMLInputElement).value;
           textRef.current = value;
           setText(value);
         }}
-        onBlur={flush}
+        onChange={(event) => {
+          const value = event.target.value;
+          textRef.current = value;
+          setText(value);
+        }}
+        onBlur={() => {
+          focusedRef.current = false;
+          flush();
+        }}
         onKeyDown={onKeyDown}
       />
     </td>

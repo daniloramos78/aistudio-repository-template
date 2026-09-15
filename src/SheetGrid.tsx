@@ -6,7 +6,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { isFirstOfMesa } from "./workbook";
+import { isFirstOfMesa, propagateIsolation } from "./workbook";
 import { rowValue, type ColumnId } from "./columns";
 import { isRedoKey, isUndoKey, keyMove, moveCell, type CellPos } from "./sheetKeys";
 import type { Polaridade, TestRow } from "./types";
@@ -60,6 +60,9 @@ export default function SheetGrid({
     onRowsChange((current) => {
       const row = current.find((item) => item.id === rowId);
       if (!row || rowValue(row, columnId) === value) return current;
+      if (columnId === "tensaoAplicada" || columnId === "isolamentoTempo") {
+        return propagateIsolation(current, rowId, columnId, value);
+      }
       return current.map((item) =>
         item.id === rowId ? { ...item, [columnId]: value } as TestRow : item,
       );

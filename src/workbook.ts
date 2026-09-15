@@ -68,17 +68,44 @@ export function createEmptyWorkbook(): Workbook {
   };
 }
 
-function copiedIsolation(inverter: Inverter): Pick<TestRow, "tensaoAplicada" | "isolamentoTempo"> {
-  const last = inverter.rows[inverter.rows.length - 1];
-  return {
-    tensaoAplicada: last?.tensaoAplicada ?? "",
-    isolamentoTempo: last?.isolamentoTempo ?? "",
-  };
+export function lastIsolationValues(
+  rows: TestRow[],
+): Pick<TestRow, "tensaoAplicada" | "isolamentoTempo"> {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = rows[i];
+    if (row.tensaoAplicada.trim() || row.isolamentoTempo.trim()) {
+      return {
+        tensaoAplicada: row.tensaoAplicada,
+        isolamentoTempo: row.isolamentoTempo,
+      };
+    }
+  }
+  return { tensaoAplicada: "", isolamentoTempo: "" };
+}
+
+export function propagateIsolation(
+  rows: TestRow[],
+  rowId: string,
+  columnId: "tensaoAplicada" | "isolamentoTempo",
+  value: string,
+): TestRow[] {
+  const index = rows.findIndex((row) => row.id === rowId);
+  if (index < 0) return rows;
+  const current = rows[index];
+  if (current[columnId] === value && rows.slice(index + 1).every((row) => row[columnId].trim())) {
+    return rows;
+  }
+  return rows.map((row, i) => {
+    if (i < index) return row;
+    if (i === index) return { ...row, [columnId]: value };
+    if (row[columnId].trim()) return row;
+    return { ...row, [columnId]: value };
+  });
 }
 
 export function addMesa(inverter: Inverter, mesaLabel: string, strings = 2): Inverter {
   const count = Math.max(1, Math.min(50, Math.trunc(Number(strings)) || 2));
-  const copied = copiedIsolation(inverter);
+  const copied = lastIsolationValues(inverter.rows);
   const rows = [...inverter.rows];
   for (let i = 0; i < count; i += 1) {
     rows.push(emptyRow({ mesa: mesaLabel.trim(), ...copied }));
@@ -94,7 +121,7 @@ export function addString(inverter: Inverter, copyMesa = true): Inverter {
       ...inverter.rows,
       emptyRow({
         mesa: copyMesa ? last?.mesa ?? "" : "",
-        ...copiedIsolation(inverter),
+        ...lastIsolationValues(inverter.rows),
       }),
     ],
   };

@@ -181,19 +181,37 @@ describe("App grid", () => {
   });
 
   it("copies tensão aplicada and tempo onto the next string", () => {
+    const addMesaBtn = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar mesa",
+    );
+    click(addMesaBtn!);
+    const confirm = Array.from(host.querySelectorAll(".modal button")).find(
+      (button) => button.textContent === "Adicionar",
+    );
+    click(confirm!);
+    fillCell(host, "tensaoAplicada", "1kV");
+    fillCell(host, "isolamentoTempo", "60s");
+    const tensoesBefore = Array.from(
+      host.querySelectorAll('[aria-label="tensaoAplicada"]'),
+    ) as HTMLInputElement[];
+    const temposBefore = Array.from(
+      host.querySelectorAll('[aria-label="isolamentoTempo"]'),
+    ) as HTMLInputElement[];
+    expect(tensoesBefore).toHaveLength(2);
+    expect(tensoesBefore[1].value).toBe("1kV");
+    expect(temposBefore[1].value).toBe("60s");
     const addString = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Adicionar string",
     );
     click(addString!);
-    fillCell(host, "tensaoAplicada", "1kV");
-    fillCell(host, "isolamentoTempo", "60s");
-    click(addString!);
     const tensoes = Array.from(host.querySelectorAll('[aria-label="tensaoAplicada"]')) as HTMLInputElement[];
     const tempos = Array.from(host.querySelectorAll('[aria-label="isolamentoTempo"]')) as HTMLInputElement[];
-    expect(tensoes).toHaveLength(2);
+    expect(tensoes).toHaveLength(3);
     expect(tensoes[1].value).toBe("1kV");
+    expect(tensoes[2].value).toBe("1kV");
     expect(tempos[1].value).toBe("60s");
-    expect((host.querySelectorAll('[aria-label="tensaoVoc"]')[1] as HTMLInputElement).value).toBe("");
+    expect(tempos[2].value).toBe("60s");
+    expect((host.querySelectorAll('[aria-label="tensaoVoc"]')[2] as HTMLInputElement).value).toBe("");
   });
 
   it("fails the row if only one floating pole stays below the module voltage", () => {

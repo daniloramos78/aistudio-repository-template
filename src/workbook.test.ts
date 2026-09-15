@@ -9,6 +9,7 @@ import {
   inverterNumberFromName,
   isFirstOfMesa,
   parseWorkbook,
+  propagateIsolation,
   serializeWorkbook,
 } from "./workbook";
 
@@ -90,5 +91,23 @@ describe("workbook", () => {
     expect(next.rows[1].tensaoAplicada).toBe("1kV");
     expect(next.rows[1].isolamentoTempo).toBe("60s");
     expect(next.rows[1].stringNo).toBe("");
+  });
+
+  it("copies isolation from the last filled row even if later mesa rows are empty", () => {
+    const inverter = addMesa(createEmptyWorkbook().inverters[0], "Mesa 01", 2);
+    inverter.rows[0].tensaoAplicada = "1kV";
+    inverter.rows[0].isolamentoTempo = "60s";
+    const next = addString(inverter, true);
+    expect(next.rows[2].tensaoAplicada).toBe("1kV");
+    expect(next.rows[2].isolamentoTempo).toBe("60s");
+    expect(next.rows[2].mesa).toBe("Mesa 01");
+  });
+
+  it("fills following empty rows when tensão aplicada is entered", () => {
+    const inverter = addMesa(createEmptyWorkbook().inverters[0], "Mesa 01", 2);
+    const rows = propagateIsolation(inverter.rows, inverter.rows[0].id, "tensaoAplicada", "1kV");
+    expect(rows[0].tensaoAplicada).toBe("1kV");
+    expect(rows[1].tensaoAplicada).toBe("1kV");
+    expect(rows[1].isolamentoTempo).toBe("");
   });
 });

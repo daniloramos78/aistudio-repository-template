@@ -1,4 +1,5 @@
 import type { ColumnConfig, ColumnId, TestRow } from "./types";
+import { LAYOUTS_KEY } from "./types";
 
 export type { ColumnConfig, ColumnId };
 
@@ -49,9 +50,76 @@ export const DEFAULT_COLUMNS: ColumnConfig = {
 };
 
 export const SMALL_PLANT_COLUMNS: ColumnConfig = {
-  ...DEFAULT_COLUMNS,
   mesa: false,
+  stringNo: true,
+  pv: false,
+  mppt: true,
+  tensaoVoc: true,
+  polaridade: true,
+  flutPositivo: true,
+  flutNegativo: true,
+  tensaoAplicada: false,
+  isolamentoTempo: false,
+  isolamentoMohm: false,
+  isolamentoGohm: false,
+  isolamentoTohm: false,
 };
+
+export const LARGE_PLANT_COLUMNS: ColumnConfig = { ...DEFAULT_COLUMNS };
+
+export type LayoutKind = "small" | "large";
+
+export type SavedLayouts = {
+  small?: ColumnConfig;
+  large?: ColumnConfig;
+};
+
+export function factoryLayout(kind: LayoutKind): ColumnConfig {
+  return kind === "small" ? { ...SMALL_PLANT_COLUMNS } : { ...LARGE_PLANT_COLUMNS };
+}
+
+export function loadLayouts(): SavedLayouts {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(LAYOUTS_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw) as SavedLayouts;
+    return data && typeof data === "object" ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+export function layoutFor(kind: LayoutKind): ColumnConfig {
+  const saved = loadLayouts()[kind];
+  return saved ? normalizeColumns(saved) : factoryLayout(kind);
+}
+
+export function saveLayout(kind: LayoutKind, columns: ColumnConfig): void {
+  if (typeof window === "undefined") return;
+  const current = loadLayouts();
+  current[kind] = normalizeColumns(columns);
+  window.localStorage.setItem(LAYOUTS_KEY, JSON.stringify(current));
+}
+
+export function needsMegohmmeter(config: ColumnConfig): boolean {
+  return Boolean(
+    config.tensaoAplicada
+    || config.isolamentoTempo
+    || config.isolamentoMohm
+    || config.isolamentoGohm
+    || config.isolamentoTohm,
+  );
+}
+
+export function needsMultimeter(config: ColumnConfig): boolean {
+  return Boolean(
+    config.tensaoVoc
+    || config.polaridade
+    || config.flutPositivo
+    || config.flutNegativo,
+  );
+}
 
 export function applyIsolationCoupling(config: ColumnConfig): ColumnConfig {
   if (config.tensaoAplicada) return config;

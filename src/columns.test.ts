@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_COLUMNS,
+  LARGE_PLANT_COLUMNS,
   SMALL_PLANT_COLUMNS,
   applyIsolationCoupling,
+  factoryLayout,
   groupSpan,
+  layoutFor,
+  needsMegohmmeter,
+  needsMultimeter,
   normalizeColumns,
   visibleColumns,
 } from "./columns";
@@ -17,10 +22,34 @@ describe("columns", () => {
     expect(DEFAULT_COLUMNS.isolamentoTohm).toBe(false);
   });
 
-  it("hides mesa for small plants", () => {
+  it("hides mesa for small plants and keeps string, mppt, voc, polarity and floating", () => {
     const cols = visibleColumns(SMALL_PLANT_COLUMNS);
-    expect(cols.some((column) => column.id === "mesa")).toBe(false);
-    expect(cols.some((column) => column.id === "stringNo")).toBe(true);
+    expect(cols.map((column) => column.id)).toEqual([
+      "stringNo",
+      "mppt",
+      "tensaoVoc",
+      "polaridade",
+      "flutPositivo",
+      "flutNegativo",
+    ]);
+    expect(needsMegohmmeter(SMALL_PLANT_COLUMNS)).toBe(false);
+    expect(needsMultimeter(SMALL_PLANT_COLUMNS)).toBe(true);
+    expect(needsMegohmmeter(DEFAULT_COLUMNS)).toBe(true);
+    expect(needsMultimeter(DEFAULT_COLUMNS)).toBe(true);
+    expect(factoryLayout("small")).toEqual(SMALL_PLANT_COLUMNS);
+    expect(factoryLayout("large")).toEqual(LARGE_PLANT_COLUMNS);
+    expect(layoutFor("small")).toEqual(SMALL_PLANT_COLUMNS);
+  });
+
+  it("ties the megohmmeter to isolation and the multimeter to voc, polarity and floating", () => {
+    expect(needsMegohmmeter({ ...DEFAULT_COLUMNS, tensaoAplicada: false, isolamentoTempo: false, isolamentoMohm: false, isolamentoGohm: false, isolamentoTohm: false })).toBe(false);
+    expect(needsMultimeter({
+      ...DEFAULT_COLUMNS,
+      tensaoVoc: false,
+      polaridade: false,
+      flutPositivo: false,
+      flutNegativo: false,
+    })).toBe(false);
   });
 
   it("falls back to all columns if everything is turned off", () => {

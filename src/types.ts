@@ -1,5 +1,7 @@
 export type Polaridade = "" | "Ok" | "Nok";
 
+export type ColorMode = "color" | "mono";
+
 export type IsolationCriterion =
   | "nbr5410"
   | "nbr16690_small"
@@ -70,6 +72,8 @@ export interface Workbook {
   tensaoModulo: string;
   criterioIsolacao: IsolationCriterion;
   columns: ColumnConfig;
+  appearance: ColorMode;
+  printAppearance: ColorMode;
   inverters: Inverter[];
   activeInverterId: string;
   multimetro: TestInstrument;
@@ -79,3 +83,4 @@ export interface Workbook {
 export const FILE_VERSION = 1 as const;
 export const DRAFT_KEY = "planilha-testes-ufv.draft";
 export const RECENT_KEY = "planilha-testes-ufv.recent";
+export const LAYOUTS_KEY = "planilha-testes-ufv.layouts";

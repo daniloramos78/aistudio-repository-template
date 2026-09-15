@@ -373,6 +373,10 @@ button, input, select {
   margin-bottom: 8px;
 }
 
+.instrument-grid.single {
+  grid-template-columns: 1fr;
+}
+
 .instrument-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -464,7 +468,112 @@ button, input, select {
 .verdict.pass .verdict-dot { background: #2e7d32; color: #fff; }
 .verdict.fail .verdict-dot { background: #c62828; color: #fff; }
 .verdict.pending .verdict-dot { background: #9a927f; color: #fff; }
-.sheet td.mesa.muted { background: #f3f0e4; font-weight: 500; color: var(--muted); }
+.sheet td.mesa.band-a,
+.sheet td.mesa.band-a input,
+.sheet td.mesa.band-a input:hover,
+.sheet td.mesa.band-a.active-cell input {
+  background: var(--mesa);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.sheet td.mesa.band-b,
+.sheet td.mesa.band-b input,
+.sheet td.mesa.band-b input:hover,
+.sheet td.mesa.band-b.active-cell input {
+  background: #ffe0b2;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.sheet td.mesa.band-a input,
+.sheet td.mesa.band-b input {
+  font-weight: 700;
+}
+
+.sheet td.mesa.muted,
+.sheet td.mesa.muted input {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.sheet td.mesa.band-a input:hover,
+.sheet td.mesa.band-b input:hover {
+  filter: brightness(1.04);
+}
+
+.app.mono .sheet,
+html.print-mono .sheet {
+  filter: grayscale(1);
+}
+
+.app.mono .sheet .group.float,
+.app.mono .sheet .group.iso,
+.app.mono .sheet .group.result-h,
+html.print-mono .sheet .group.float,
+html.print-mono .sheet .group.iso,
+html.print-mono .sheet .group.result-h {
+  background: #6d6d6d;
+  color: #fff;
+}
+
+.app.mono .sheet td.mesa.band-a,
+.app.mono .sheet td.mesa.band-a input,
+html.print-mono .sheet td.mesa.band-a,
+html.print-mono .sheet td.mesa.band-a input {
+  background: #d5d5d5;
+}
+
+.app.mono .sheet td.mesa.band-b,
+.app.mono .sheet td.mesa.band-b input,
+html.print-mono .sheet td.mesa.band-b,
+html.print-mono .sheet td.mesa.band-b input {
+  background: #ececec;
+}
+
+.app.mono .verdict.pass .verdict-dot,
+html.print-mono .verdict.pass .verdict-dot {
+  background: #4a4a4a;
+}
+
+.app.mono .verdict.fail .verdict-dot,
+html.print-mono .verdict.fail .verdict-dot {
+  background: #7a7a7a;
+}
+
+.config-appearance {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.config-appearance fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.config-appearance legend {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.config-appearance label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink);
+}
 
 .sheet .empty {
   padding: 48px 16px;

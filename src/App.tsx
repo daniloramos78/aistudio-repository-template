@@ -6,16 +6,19 @@ import FieldInput from "./FieldInput";
 import InstrumentsModal from "./InstrumentsModal";
 import SheetGrid from "./SheetGrid";
 import { isRedoKey, isUndoKey } from "./sheetKeys";
-import type { Inverter, IsolationCriterion, TestRow, Workbook } from "./types";
+import type { ColorMode, Inverter, IsolationCriterion, TestRow, Workbook } from "./types";
 import { DRAFT_KEY, RECENT_KEY } from "./types";
 import {
   COLUMNS,
   DEFAULT_COLUMNS,
   GROUP_LABEL,
-  SMALL_PLANT_COLUMNS,
   applyIsolationCoupling,
   groupSpan,
+  layoutFor,
+  needsMegohmmeter,
+  needsMultimeter,
   normalizeColumns,
+  saveLayout,
   visibleColumns,
   type ColumnConfig,
   type ColumnGroup,
@@ -58,6 +61,9 @@ export default function App() {
   const [configOpen, setConfigOpen] = useState(false);
   const [instrumentsOpen, setInstrumentsOpen] = useState(false);
   const [draftColumns, setDraftColumns] = useState<ColumnConfig>(DEFAULT_COLUMNS);
+  const [draftAppearance, setDraftAppearance] = useState<ColorMode>("color");
+  const [draftPrintAppearance, setDraftPrintAppearance] = useState<ColorMode>("color");
+  const [layoutNote, setLayoutNote] = useState("");
   const [mesaOpen, setMesaOpen] = useState(false);
   const [mesaName, setMesaName] = useState("");
   const [mesaCount, setMesaCount] = useState("2");
@@ -146,6 +152,19 @@ export default function App() {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    const before = () => {
+      document.documentElement.classList.toggle("print-mono", book.printAppearance === "mono");
+    };
+    const after = () => document.documentElement.classList.remove("print-mono");
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, [book.printAppearance]);
 
   useEffect(() => {
     if (demo) return;
@@ -424,7 +443,7 @@ export default function App() {
   }, [book, columns]);
 
   return (
-    <div className={demo ? "app demo" : "app"}>
+    <div className={[demo ? "app demo" : "app", book.appearance === "mono" ? "mono" : ""].filter(Boolean).join(" ")}>
       {demo && (
         <div className="demo-banner no-print">
           Página de teste com dados de exemplo (UFV Manga G. 05). Edite à vontade — nada é enviado
@@ -456,13 +475,19 @@ export default function App() {
             onClick={() => setInstrumentsOpen(true)}
           >
             Instrumentos
-            {instrumentHasData(book.multimetro) || instrumentHasData(book.megometro) ? " ✓" : ""}
+            {(needsMultimeter(columns) && instrumentHasData(book.multimetro))
+              || (needsMegohmmeter(columns) && instrumentHasData(book.megometro))
+              ? " ✓"
+              : ""}
           </button>
           <button
             type="button"
             className="ghost"
             onClick={() => {
               setDraftColumns(columns);
+              setDraftAppearance(book.appearance === "mono" ? "mono" : "color");
+              setDraftPrintAppearance(book.printAppearance === "mono" ? "mono" : "color");
+              setLayoutNote("");
               setConfigOpen(true);
             }}
           >
@@ -564,46 +589,54 @@ export default function App() {
           </span>
         </div>
         <div className="criteria">
-          <label>
-            Voc esperada da string
-            <FieldInput
-              value={book.vocEsperada}
-              placeholder="Ex.: 1000"
-              onChange={(value) => patchHeader({ vocEsperada: value })}
-            />
-          </label>
-          <label>
-            Erro ± (%)
-            <FieldInput
-              value={book.erroPercentual}
-              placeholder="Ex.: 5"
-              inputMode="decimal"
-              onChange={(value) => patchHeader({ erroPercentual: value })}
-            />
-          </label>
-          <label>
-            Tensão do módulo
-            <FieldInput
-              value={book.tensaoModulo}
-              placeholder="Ex.: 45,6V"
-              onChange={(value) => patchHeader({ tensaoModulo: value })}
-            />
-          </label>
-          <label>
-            Isolação
-            <select
-              value={book.criterioIsolacao}
-              onChange={(e) =>
-                patchHeader({ criterioIsolacao: e.target.value as IsolationCriterion })
-              }
-            >
-              {ISOLATION_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {columns.tensaoVoc && (
+            <label>
+              Voc esperada da string
+              <FieldInput
+                value={book.vocEsperada}
+                placeholder="Ex.: 1000"
+                onChange={(value) => patchHeader({ vocEsperada: value })}
+              />
+            </label>
+          )}
+          {columns.tensaoVoc && (
+            <label>
+              Erro ± (%)
+              <FieldInput
+                value={book.erroPercentual}
+                placeholder="Ex.: 5"
+                inputMode="decimal"
+                onChange={(value) => patchHeader({ erroPercentual: value })}
+              />
+            </label>
+          )}
+          {(columns.flutPositivo || columns.flutNegativo) && (
+            <label>
+              Tensão do módulo
+              <FieldInput
+                value={book.tensaoModulo}
+                placeholder="Ex.: 45,6V"
+                onChange={(value) => patchHeader({ tensaoModulo: value })}
+              />
+            </label>
+          )}
+          {needsMegohmmeter(columns) && (
+            <label>
+              Isolação
+              <select
+                value={book.criterioIsolacao}
+                onChange={(e) =>
+                  patchHeader({ criterioIsolacao: e.target.value as IsolationCriterion })
+                }
+              >
+                {ISOLATION_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <div className="actions">
           {columns.mesa && (
@@ -703,13 +736,14 @@ export default function App() {
         <p>
           {book.ufv || "UFV não informada"} · {fileTitle(book)}
         </p>
-        {(instrumentHasData(book.multimetro) || instrumentHasData(book.megometro)) && (
+        {((needsMultimeter(columns) && instrumentHasData(book.multimetro))
+          || (needsMegohmmeter(columns) && instrumentHasData(book.megometro))) && (
           <p>
             {[
-              instrumentHasData(book.multimetro)
+              needsMultimeter(columns) && instrumentHasData(book.multimetro)
                 ? `Multímetro/alicate: ${book.multimetro.fabricanteModelo || "—"}`
                 : "",
-              instrumentHasData(book.megometro)
+              needsMegohmmeter(columns) && instrumentHasData(book.megometro)
                 ? `Megômetro: ${book.megometro.fabricanteModelo || "—"}`
                 : "",
             ].filter(Boolean).join(" · ")}
@@ -778,6 +812,8 @@ export default function App() {
 
       <InstrumentsModal
         open={instrumentsOpen}
+        showMultimeter={needsMultimeter(columns)}
+        showMegohmmeter={needsMegohmmeter(columns)}
         multimetro={book.multimetro}
         megometro={book.megometro}
         onClose={() => setInstrumentsOpen(false)}
@@ -794,17 +830,82 @@ export default function App() {
           >
             <h2 id="config-title">Configuração da planilha</h2>
             <p className="modal-hint">
-              Por padrão todos os campos vêm ligados, menos TΩ. Desmarcar Tensão aplicada esconde
-              também Tempo, MΩ, GΩ e TΩ.
+              Marque os campos do teste. Desmarcar Tensão aplicada esconde Tempo e os ohms.
+              Salve um modelo para usina pequena ou grande e reutilize nos próximos testes.
             </p>
+            <div className="config-appearance">
+              <fieldset>
+                <legend>Planilha na tela</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="appearance"
+                    checked={draftAppearance === "color"}
+                    onChange={() => setDraftAppearance("color")}
+                  />
+                  Colorida
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="appearance"
+                    checked={draftAppearance === "mono"}
+                    onChange={() => setDraftAppearance("mono")}
+                  />
+                  Preto e branco (cinza)
+                </label>
+              </fieldset>
+              <fieldset>
+                <legend>Impressão e PDF</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="print-appearance"
+                    checked={draftPrintAppearance === "color"}
+                    onChange={() => setDraftPrintAppearance("color")}
+                  />
+                  Colorido
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="print-appearance"
+                    checked={draftPrintAppearance === "mono"}
+                    onChange={() => setDraftPrintAppearance("mono")}
+                  />
+                  Preto e branco
+                </label>
+              </fieldset>
+            </div>
             <div className="modal-actions" style={{ marginBottom: 12 }}>
-              <button type="button" onClick={() => setDraftColumns({ ...DEFAULT_COLUMNS })}>
-                Todos os campos
+              <button type="button" onClick={() => setDraftColumns(layoutFor("large"))}>
+                Usina grande
               </button>
-              <button type="button" onClick={() => setDraftColumns({ ...SMALL_PLANT_COLUMNS })}>
-                Usina pequena (sem mesa)
+              <button type="button" onClick={() => setDraftColumns(layoutFor("small"))}>
+                Usina pequena
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  saveLayout("large", draftColumns);
+                  setLayoutNote("Modelo de usina grande salvo neste computador.");
+                  setStatus({ kind: "ok", text: "Modelo de usina grande salvo neste computador." });
+                }}
+              >
+                Salvar como usina grande
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  saveLayout("small", draftColumns);
+                  setLayoutNote("Modelo de usina pequena salvo neste computador.");
+                  setStatus({ kind: "ok", text: "Modelo de usina pequena salvo neste computador." });
+                }}
+              >
+                Salvar como usina pequena
               </button>
             </div>
+            {layoutNote && <p className="modal-hint">{layoutNote}</p>}
             {(["id", "float", "iso"] as ColumnGroup[]).map((group) => (
               <fieldset key={group} className="config-group">
                 <legend>{GROUP_LABEL[group]}</legend>
@@ -845,7 +946,12 @@ export default function App() {
                   mark(
                     (current) => {
                       rememberBook(current);
-                      return { ...current, columns: normalizeColumns(draftColumns) };
+                      return {
+                        ...current,
+                        columns: normalizeColumns(draftColumns),
+                        appearance: draftAppearance,
+                        printAppearance: draftPrintAppearance,
+                      };
                     },
                     "Configuração da planilha atualizada",
                   );

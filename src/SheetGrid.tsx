@@ -7,7 +7,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { isFirstOfMesa, propagateIsolation } from "./workbook";
+import { isFirstOfMesa, mesaColorBand, propagateIsolation } from "./workbook";
 import { rowValue, type ColumnId } from "./columns";
 import { isRedoKey, isUndoKey, keyMove, moveCell, type CellPos } from "./sheetKeys";
 import type { Polaridade, TestRow } from "./types";
@@ -84,6 +84,7 @@ function SheetGrid({
               columnId={columnId}
               colIndex={colIndex}
               first={isFirstOfMesa(rows, rowIndex)}
+              band={mesaColorBand(rows, rowIndex)}
               active={active.row === rowIndex && active.col === colIndex}
               onActivate={() => activate(rowIndex, colIndex)}
               onCommit={(value) => commit(row.id, columnId, value)}
@@ -112,6 +113,7 @@ function SheetCell({
   row,
   columnId,
   first,
+  band,
   active,
   onActivate,
   onCommit,
@@ -124,6 +126,7 @@ function SheetCell({
   columnId: ColumnId;
   colIndex: number;
   first: boolean;
+  band: "a" | "b";
   active: boolean;
   onActivate: () => void;
   onCommit: (value: string) => void;
@@ -208,7 +211,7 @@ function SheetCell({
 
   const className = [
     active ? "active-cell" : "",
-    columnId === "mesa" ? (first ? "mesa" : "mesa muted") : "",
+    columnId === "mesa" ? `mesa band-${band}${first ? "" : " muted"}` : "",
   ].filter(Boolean).join(" ") || undefined;
 
   if (columnId === "polaridade") {

@@ -18,6 +18,8 @@ const FIELDS: Array<{
 
 interface Props {
   open: boolean;
+  showMultimeter: boolean;
+  showMegohmmeter: boolean;
   multimetro: TestInstrument;
   megometro: TestInstrument;
   onClose: () => void;
@@ -26,6 +28,8 @@ interface Props {
 
 export default function InstrumentsModal({
   open,
+  showMultimeter,
+  showMegohmmeter,
   multimetro,
   megometro,
   onClose,
@@ -43,23 +47,34 @@ export default function InstrumentsModal({
       >
         <h2 id="instruments-title">Equipamentos de ensaio</h2>
         <p className="modal-hint">
-          Identificação e calibração do multímetro ou alicate amperímetro e do megômetro usados
-          neste teste. Os dados entram no PDF.
+          O multímetro/alicate entra quando há Voc, polaridade ou flutuação. O megômetro entra
+          quando há teste de isolação. Os dados vão para o PDF.
         </p>
-        <div className="instrument-grid">
-          <InstrumentCard
-            title="Multímetro / alicate amperímetro"
-            filled={instrumentHasData(multimetro)}
-            value={multimetro}
-            onChange={(patch) => onChange("multimetro", patch)}
-          />
-          <InstrumentCard
-            title="Megômetro"
-            filled={instrumentHasData(megometro)}
-            value={megometro}
-            onChange={(patch) => onChange("megometro", patch)}
-          />
-        </div>
+        {!showMultimeter && !showMegohmmeter ? (
+          <p className="modal-hint">
+            Nenhum desses testes está ligado. Em Configuração, marque Voc, polaridade, flutuação
+            ou isolação para cadastrar o instrumento.
+          </p>
+        ) : (
+          <div className={showMultimeter && showMegohmmeter ? "instrument-grid" : "instrument-grid single"}>
+            {showMultimeter && (
+              <InstrumentCard
+                title="Multímetro / alicate amperímetro"
+                filled={instrumentHasData(multimetro)}
+                value={multimetro}
+                onChange={(patch) => onChange("multimetro", patch)}
+              />
+            )}
+            {showMegohmmeter && (
+              <InstrumentCard
+                title="Megômetro"
+                filled={instrumentHasData(megometro)}
+                value={megometro}
+                onChange={(patch) => onChange("megometro", patch)}
+              />
+            )}
+          </div>
+        )}
         <div className="modal-actions">
           <button type="button" className="primary" onClick={onClose}>
             Fechar

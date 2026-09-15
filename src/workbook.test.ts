@@ -8,6 +8,7 @@ import {
   inverterNameFromNumber,
   inverterNumberFromName,
   isFirstOfMesa,
+  mesaColorBand,
   parseWorkbook,
   propagateIsolation,
   serializeWorkbook,
@@ -36,6 +37,10 @@ describe("workbook", () => {
     expect(inverter.rows[1].stringNo).toBe("");
     expect(isFirstOfMesa(inverter.rows, 0)).toBe(true);
     expect(isFirstOfMesa(inverter.rows, 1)).toBe(false);
+    expect(mesaColorBand(inverter.rows, 0)).toBe("a");
+    expect(mesaColorBand(inverter.rows, 1)).toBe("a");
+    const two = addMesa(inverter, "Mesa 02", 1);
+    expect(mesaColorBand(two.rows, 2)).toBe("b");
   });
 
   it("loads the Manga G. 05 example used in field sheets", () => {
@@ -81,6 +86,8 @@ describe("workbook", () => {
     expect(restored.endereco).toBe("");
     expect(restored.criterioIsolacao).toBe("nbr5410");
     expect(restored.columns.isolamentoTohm).toBe(false);
+    expect(restored.appearance).toBe("color");
+    expect(restored.printAppearance).toBe("color");
   });
 
   it("copies tensão aplicada and tempo from the previous row", () => {

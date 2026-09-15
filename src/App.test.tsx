@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { DRAFT_KEY, RECENT_KEY } from "./types";
+import { DRAFT_KEY, LAYOUTS_KEY, RECENT_KEY } from "./types";
 
 function click(el: Element) {
   act(() => {
@@ -55,6 +55,7 @@ describe("App grid", () => {
     vi.unstubAllGlobals();
     window.localStorage.removeItem(DRAFT_KEY);
     window.localStorage.removeItem(RECENT_KEY);
+    window.localStorage.removeItem(LAYOUTS_KEY);
   });
 
   it("adds an empty string row that accepts typed values", () => {
@@ -196,6 +197,13 @@ describe("App grid", () => {
     expect(headers).not.toContain("Tempo");
     expect(headers).not.toContain("MΩ");
     expect(headers).toContain("Positivo + T");
+    const open = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Instrumentos" || button.textContent === "Instrumentos ✓",
+    );
+    click(open!);
+    const dialog = host.querySelector('[aria-labelledby="instruments-title"]') as HTMLElement;
+    expect(dialog.textContent).toContain("Multímetro");
+    expect(dialog.textContent).not.toContain("Megômetro");
   });
 
   it("copies tensão aplicada and tempo onto the next string", () => {
@@ -266,7 +274,7 @@ describe("App grid", () => {
     );
     click(config!);
     const small = Array.from(host.querySelectorAll("button")).find(
-      (button) => button.textContent === "Usina pequena (sem mesa)",
+      (button) => button.textContent === "Usina pequena",
     );
     click(small!);
     const apply = Array.from(host.querySelectorAll("button")).find(
@@ -277,13 +285,20 @@ describe("App grid", () => {
     expect(
       Array.from(host.querySelectorAll("button")).some((button) => button.textContent === "Adicionar mesa"),
     ).toBe(false);
-    expect(host.textContent).not.toMatch(/Identificação[\s\S]*Mesa[\s\S]*String/);
-    const headers = Array.from(host.querySelectorAll(".sheet thead tr:last-child th")).map(
-      (th) => th.textContent,
+    const headers = Array.from(host.querySelectorAll(".sheet thead tr:last-child th"))
+      .map((th) => th.textContent)
+      .filter(Boolean);
+    expect(headers).toEqual(["String", "MPPT", "Tensão Voc", "Polaridade", "Positivo + T", "Negativo + T", "Aprov."]);
+    expect(host.textContent).not.toContain("Teste de Isolação");
+    expect(host.textContent).not.toContain("Isolação");
+
+    const open = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Instrumentos" || button.textContent === "Instrumentos ✓",
     );
-    expect(headers).not.toContain("Mesa");
-    expect(headers).toContain("String");
-    expect(headers).toContain("MPPT");
+    click(open!);
+    const dialog = host.querySelector('[aria-labelledby="instruments-title"]') as HTMLElement;
+    expect(dialog.textContent).toContain("Multímetro");
+    expect(dialog.textContent).not.toContain("Megômetro");
   });
 
   it("places Adicionar inversor next to Adicionar string and not in the tabs", () => {
@@ -325,5 +340,69 @@ describe("App grid", () => {
     click(close!);
     expect(host.querySelector('[aria-labelledby="instruments-title"]')).toBeNull();
     expect(host.textContent).toContain("Instrumentos ✓");
+  });
+
+  it("paints alternating mesa cells on the grid", () => {
+    const addMesa = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar mesa",
+    );
+    click(addMesa!);
+    const dialog = host.querySelector('[aria-labelledby="mesa-title"]');
+    typeInto(dialog!.querySelector("input") as HTMLInputElement, "Mesa 01");
+    click(Array.from(dialog!.querySelectorAll("button")).find((button) => button.textContent === "Adicionar")!);
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    const mesas = () => Array.from(host.querySelectorAll('[aria-label="mesa"]')) as HTMLInputElement[];
+    typeInto(mesas()[2], "Mesa 02");
+    act(() => { mesas()[2].blur(); });
+    expect(mesas()[0].closest("td")?.className).toContain("band-a");
+    expect(mesas()[1].closest("td")?.className).toContain("band-a");
+    expect(mesas()[2].closest("td")?.className).toContain("band-b");
+  });
+
+  it("saves a custom small-plant layout and reloads it", () => {
+    const config = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Configuração",
+    );
+    click(config!);
+    const pv = Array.from(host.querySelectorAll(".modal label.check")).find((label) =>
+      label.textContent?.trim() === "PV",
+    )?.querySelector("input") as HTMLInputElement;
+    expect(pv.checked).toBe(true);
+    click(pv);
+    click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Salvar como usina pequena")!);
+    click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Usina grande")!);
+    expect(
+      (Array.from(host.querySelectorAll(".modal label.check")).find((label) =>
+        label.textContent?.trim() === "PV",
+      )?.querySelector("input") as HTMLInputElement).checked,
+    ).toBe(true);
+    click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Usina pequena")!);
+    expect(
+      (Array.from(host.querySelectorAll(".modal label.check")).find((label) =>
+        label.textContent?.trim() === "PV",
+      )?.querySelector("input") as HTMLInputElement).checked,
+    ).toBe(false);
+  });
+
+  it("switches the on-screen sheet to grayscale from Configuração", () => {
+    const config = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Configuração",
+    );
+    click(config!);
+    expect(host.textContent).toContain("Planilha na tela");
+    expect(host.textContent).toContain("Impressão e PDF");
+    const mono = Array.from(host.querySelectorAll(".config-appearance label")).find((label) =>
+      label.textContent?.includes("Preto e branco (cinza)"),
+    )?.querySelector("input") as HTMLInputElement;
+    click(mono);
+    const printMono = Array.from(host.querySelectorAll(".config-appearance label")).find((label) =>
+      label.textContent?.trim() === "Preto e branco",
+    )?.querySelector("input") as HTMLInputElement;
+    click(printMono);
+    click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Aplicar")!);
+    expect(host.querySelector(".app")?.classList.contains("mono")).toBe(true);
   });
 });

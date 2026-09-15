@@ -112,6 +112,8 @@ export function createEmptyWorkbook(): Workbook {
     tensaoModulo: "",
     criterioIsolacao: "nbr5410",
     columns: { ...DEFAULT_COLUMNS },
+    appearance: "color",
+    printAppearance: "color",
     inverters,
     activeInverterId: inverters[0].id,
     multimetro: emptyInstrument(),
@@ -215,6 +217,14 @@ export function isFirstOfMesa(rows: TestRow[], index: number): boolean {
   return current !== previous;
 }
 
+export function mesaColorBand(rows: TestRow[], index: number): "a" | "b" {
+  let band: "a" | "b" = "a";
+  for (let i = 1; i <= index; i += 1) {
+    if (isFirstOfMesa(rows, i)) band = band === "a" ? "b" : "a";
+  }
+  return band;
+}
+
 export function serializeWorkbook(workbook: Workbook): string {
   return `${JSON.stringify(workbook, null, 2)}\n`;
 }
@@ -244,6 +254,8 @@ export function parseWorkbook(raw: string): Workbook {
     tensaoModulo: String(data.tensaoModulo ?? ""),
     criterioIsolacao: parseCriterion(data.criterioIsolacao),
     columns: normalizeColumns(data.columns as Partial<ColumnConfig> | undefined),
+    appearance: data.appearance === "mono" ? "mono" : "color",
+    printAppearance: data.printAppearance === "mono" ? "mono" : "color",
     inverters,
     activeInverterId: active,
     multimetro: normalizeInstrument(data.multimetro),

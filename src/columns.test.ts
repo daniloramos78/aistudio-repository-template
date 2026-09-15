@@ -2,15 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_COLUMNS,
   SMALL_PLANT_COLUMNS,
+  applyIsolationCoupling,
   groupSpan,
   normalizeColumns,
   visibleColumns,
 } from "./columns";
 
 describe("columns", () => {
-  it("defaults to every field visible", () => {
+  it("defaults to every field visible except TΩ", () => {
     expect(visibleColumns(DEFAULT_COLUMNS)).toHaveLength(12);
     expect(groupSpan(DEFAULT_COLUMNS, "id")).toBe(6);
+    expect(groupSpan(DEFAULT_COLUMNS, "float")).toBe(2);
+    expect(groupSpan(DEFAULT_COLUMNS, "iso")).toBe(4);
+    expect(DEFAULT_COLUMNS.isolamentoTohm).toBe(false);
   });
 
   it("hides mesa for small plants", () => {
@@ -35,5 +39,16 @@ describe("columns", () => {
       isolamentoGohm: false,
     });
     expect(restored.mesa).toBe(true);
+  });
+
+  it("turns off tempo and ohm columns when tensão aplicada is hidden", () => {
+    const next = applyIsolationCoupling({
+      ...DEFAULT_COLUMNS,
+      tensaoAplicada: false,
+    });
+    expect(next.isolamentoTempo).toBe(false);
+    expect(next.isolamentoMohm).toBe(false);
+    expect(next.isolamentoGohm).toBe(false);
+    expect(next.isolamentoTohm).toBe(false);
   });
 });

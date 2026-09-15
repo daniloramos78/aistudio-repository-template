@@ -10,6 +10,7 @@ import {
   type ColumnGroup,
 } from "./columns";
 import type { Workbook } from "./types";
+import { evaluateRow, verdictLabel } from "./verdict";
 import dejaVuBold from "./fonts/DejaVuSansOhm-Bold.ttf?inline";
 import dejaVuRegular from "./fonts/DejaVuSansOhm.ttf?inline";
 
@@ -58,15 +59,27 @@ export function buildPdf(workbook: Workbook): Uint8Array {
     doc.text(`Temperatura: ${workbook.temperatura ? `${workbook.temperatura}°C` : "—"}`, 185, 19);
     doc.text(inverter.name, 250, 19, { align: "right" });
 
+    doc.setFontSize(8);
+    const extra = [
+      workbook.endereco ? `Endereço: ${workbook.endereco}` : "",
+      workbook.vocEsperada ? `Voc esp.: ${workbook.vocEsperada}` : "",
+      workbook.erroPercentual ? `Erro ±: ${workbook.erroPercentual}%` : "",
+      workbook.tensaoModulo ? `Módulo: ${workbook.tensaoModulo}` : "",
+    ].filter(Boolean);
+    if (extra.length) {
+      doc.text(extra.join("  ·  "), margin, 25);
+    }
     if (workbook.tecnico) {
-      doc.text(`Técnico: ${workbook.tecnico}`, margin, 25);
+      doc.text(`Técnico: ${workbook.tecnico}`, margin, extra.length ? 30 : 25);
     }
     if (workbook.observacoes) {
-      doc.text(`Observações: ${workbook.observacoes}`, 80, 25);
+      doc.text(`Observações: ${workbook.observacoes}`, 80, extra.length ? 30 : 25);
     }
 
+    const headOffset = extra.length || workbook.tecnico || workbook.observacoes ? 34 : 28;
+
     autoTable(doc, {
-      startY: workbook.tecnico || workbook.observacoes ? 29 : 28,
+      startY: headOffset,
       theme: "grid",
       styles: {
         font: FONT,
@@ -85,7 +98,7 @@ export function buildPdf(workbook: Workbook): Uint8Array {
       body: inverter.rows.map((row, rowIndex) => {
         const first =
           rowIndex === 0 || row.mesa.trim() !== inverter.rows[rowIndex - 1].mesa.trim();
-        return vis.map((column) => {
+        const cells: Array<string | { content: string; styles: Record<string, unknown> }> = vis.map((column) => {
           if (column.id === "mesa") {
             return {
               content: row.mesa,
@@ -96,10 +109,22 @@ export function buildPdf(workbook: Workbook): Uint8Array {
           }
           return rowValue(row, column.id);
         });
+        const verdict = evaluateRow(row, workbook, columns);
+        cells.push({
+          content: verdictLabel(verdict),
+          styles:
+            verdict === "pass"
+              ? { fillColor: [200, 230, 201], fontStyle: "bold", textColor: [21, 92, 56] }
+              : verdict === "fail"
+                ? { fillColor: [255, 205, 210], fontStyle: "bold", textColor: [155, 44, 44] }
+                : { textColor: 90 },
+        });
+        return cells;
       }),
       columnStyles: vis[0]?.id === "mesa" ? { 0: { cellWidth: 22 } } : {},
       didParseCell: (data) => {
         if (data.section !== "head" || data.row.index !== 1) return;
+        if (data.column.index >= vis.length) return;
         const column = vis[data.column.index];
         if (!column) return;
         if (column.group === "float") data.cell.styles.fillColor = [200, 230, 201];
@@ -135,5 +160,10 @@ function pdfHead(config: ColumnConfig) {
           : { fillColor: [230, 126, 34] as [number, number, number], textColor: 255 };
     return [{ content: GROUP_LABEL[group], colSpan: span, styles }];
   });
-  return [groupRow, visibleColumns(config).map((column) => column.label)];
+  groupRow.push({
+    content: "Resultado",
+    colSpan: 1,
+    styles: { fillColor: [23, 54, 40] as [number, number, number], textColor: 255 },
+  });
+  return [groupRow, [...visibleColumns(config).map((column) => column.label), "Aprov."]];
 }

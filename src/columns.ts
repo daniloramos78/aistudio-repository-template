@@ -19,10 +19,11 @@ export const COLUMNS: ColumnDef[] = [
   { id: "polaridade", label: "Polaridade", group: "id" },
   { id: "flutPositivo", label: "Positivo + T", group: "float" },
   { id: "flutNegativo", label: "Negativo + T", group: "float" },
-  { id: "tensaoAplicada", label: "Tensão Aplicada", group: "float" },
+  { id: "tensaoAplicada", label: "Tensão Aplicada", group: "iso" },
   { id: "isolamentoTempo", label: "Tempo", group: "iso" },
   { id: "isolamentoMohm", label: "MΩ", group: "iso" },
   { id: "isolamentoGohm", label: "GΩ", group: "iso" },
+  { id: "isolamentoTohm", label: "TΩ", group: "iso" },
 ];
 
 export const GROUP_LABEL: Record<ColumnGroup, string> = {
@@ -44,6 +45,7 @@ export const DEFAULT_COLUMNS: ColumnConfig = {
   isolamentoTempo: true,
   isolamentoMohm: true,
   isolamentoGohm: true,
+  isolamentoTohm: false,
 };
 
 export const SMALL_PLANT_COLUMNS: ColumnConfig = {
@@ -51,8 +53,19 @@ export const SMALL_PLANT_COLUMNS: ColumnConfig = {
   mesa: false,
 };
 
+export function applyIsolationCoupling(config: ColumnConfig): ColumnConfig {
+  if (config.tensaoAplicada) return config;
+  return {
+    ...config,
+    isolamentoTempo: false,
+    isolamentoMohm: false,
+    isolamentoGohm: false,
+    isolamentoTohm: false,
+  };
+}
+
 export function normalizeColumns(input?: Partial<ColumnConfig> | null): ColumnConfig {
-  const next = { ...DEFAULT_COLUMNS, ...input };
+  const next = applyIsolationCoupling({ ...DEFAULT_COLUMNS, ...input });
   if (!COLUMNS.some((column) => next[column.id])) {
     return { ...DEFAULT_COLUMNS };
   }

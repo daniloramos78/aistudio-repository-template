@@ -266,8 +266,10 @@ button, input, select {
 
 .sheet-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
+  gap: 12px;
   padding: 10px 16px;
   background: var(--sheet);
   border-top: 1px solid var(--line);
@@ -276,6 +278,39 @@ button, input, select {
 .sheet-toolbar span {
   margin-left: 10px;
   color: var(--muted);
+}
+
+.criteria {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1;
+}
+
+.criteria label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.criteria input,
+.criteria select,
+.meta select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+
+.criteria select {
+  min-width: 15rem;
 }
 
 .sheet-wrap {
@@ -376,7 +411,29 @@ button, input, select {
   background: #fff;
 }
 
-.sheet td.mesa { background: var(--mesa); font-weight: 700; }
+.sheet .group.result-h {
+  background: var(--forest);
+  color: white;
+}
+
+.sheet td.verdict {
+  width: 54px;
+  padding: 4px;
+}
+
+.verdict-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.verdict.pass .verdict-dot { background: #2e7d32; color: #fff; }
+.verdict.fail .verdict-dot { background: #c62828; color: #fff; }
+.verdict.pending .verdict-dot { background: #9a927f; color: #fff; }
 .sheet td.mesa.muted { background: #f3f0e4; font-weight: 500; color: var(--muted); }
 
 .sheet .empty {

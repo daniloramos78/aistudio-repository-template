@@ -6,7 +6,7 @@ O modelo segue a planilha `Planilha de Testes.ods` (abas `INVERSOR_01` … `INVE
 
 ## No Windows
 
-Há um executável **portátil** (`Planilha de Testes UFV 1.2.0.exe`): copie para o PC (pasta, pen drive ou área de trabalho) e abra com dois cliques. Não precisa instalar nada.
+Há um executável **portátil** (`Planilha de Testes UFV 1.3.0.exe`): copie para o PC (pasta, pen drive ou área de trabalho) e abra com dois cliques. Não precisa instalar nada.
 
 Para gerar o **instalador** com atalho no menu Iniciar e na área de trabalho, no próprio Windows:
 
@@ -17,15 +17,15 @@ npm run dist:win
 
 Os arquivos saem na pasta `release/`:
 
-- `Planilha de Testes UFV Setup 1.2.0.exe` — instalador
-- `Planilha de Testes UFV 1.2.0.exe` — portátil
+- `Planilha de Testes UFV Setup 1.3.0.exe` — instalador
+- `Planilha de Testes UFV 1.3.0.exe` — portátil
 
 Depois de abrir o app:
 
-1. Preencha data, umidade, temperatura e o nome da UFV.
-2. Em **Configuração**, ligue ou desligue colunas (mesa, string, MPPT, testes). O padrão é todos os campos; usina pequena pode ficar sem mesa.
-3. Em cada aba de inversor, use **Adicionar mesa** (abre um diálogo; as linhas entram vazias) ou **Adicionar string**.
-4. Clique na célula e digite. **Enter** desce, **setas** mudam de célula, **Ctrl+Z** desfaz. Clique em **Salvar**.
+1. Preencha data, UFV, **endereço**, Voc esperada da string, erro ± %, tensão do módulo e o critério de isolação.
+2. Em **Configuração**, ligue ou desligue colunas. Desmarcar Tensão aplicada esconde Tempo e os ohms. TΩ vem desligado.
+3. Em cada aba de inversor, use **Adicionar mesa** ou **Adicionar string**. Tensão aplicada e Tempo copiam da linha anterior, como a mesa.
+4. Clique na célula e digite. A bolinha no fim da linha mostra **Aprovado** (check verde) ou **Reprovado** (X). Clique em **Salvar**.
 5. **Salvar PDF** ou **Imprimir** gera o relatório.
 6. **Novo** começa outro teste. **Abrir** recupera um teste antigo.
 

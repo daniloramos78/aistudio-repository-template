@@ -4,13 +4,14 @@ import { buildPdf } from "./pdf";
 import { openWorkbookFile, savePdfFile, saveWorkbookFile } from "./platform";
 import SheetGrid from "./SheetGrid";
 import { isRedoKey, isUndoKey } from "./sheetKeys";
-import type { Inverter, TestRow, Workbook } from "./types";
+import type { Inverter, IsolationCriterion, TestRow, Workbook } from "./types";
 import { DRAFT_KEY, RECENT_KEY } from "./types";
 import {
   COLUMNS,
   DEFAULT_COLUMNS,
   GROUP_LABEL,
   SMALL_PLANT_COLUMNS,
+  applyIsolationCoupling,
   groupSpan,
   normalizeColumns,
   visibleColumns,
@@ -33,6 +34,7 @@ import {
   serializeWorkbook,
   suggestedFileName,
 } from "./workbook";
+import { ISOLATION_OPTIONS, evaluateRow } from "./verdict";
 
 type Status = { kind: "ok" | "warn" | "err"; text: string };
 
@@ -378,13 +380,23 @@ export default function App() {
 
   const columns = book.columns ?? DEFAULT_COLUMNS;
   const vis = visibleColumns(columns);
+  const verdicts = useMemo(
+    () => active.rows.map((row) => evaluateRow(row, book, columns)),
+    [active.rows, book, columns],
+  );
   const stats = useMemo(() => {
     const rows = book.inverters.flatMap((inv) => inv.rows);
     const mesas = new Set(rows.map((row) => row.mesa.trim()).filter(Boolean)).size;
-    const ok = rows.filter((row) => row.polaridade === "Ok").length;
-    const nok = rows.filter((row) => row.polaridade === "Nok").length;
-    return { strings: rows.length, mesas, ok, nok };
-  }, [book]);
+    const approved = book.inverters.flatMap((inv) =>
+      inv.rows.map((row) => evaluateRow(row, book, columns)),
+    );
+    return {
+      strings: rows.length,
+      mesas,
+      pass: approved.filter((item) => item === "pass").length,
+      fail: approved.filter((item) => item === "fail").length,
+    };
+  }, [book, columns]);
 
   return (
     <div className={demo ? "app demo" : "app"}>
@@ -464,6 +476,14 @@ export default function App() {
             onChange={(e) => patchHeader({ ufv: e.target.value })}
           />
         </label>
+        <label className="wide">
+          Endereço
+          <input
+            value={book.endereco}
+            placeholder="Usina, talhão, coordenadas…"
+            onChange={(e) => patchHeader({ endereco: e.target.value })}
+          />
+        </label>
         <label>
           Técnico
           <input
@@ -511,8 +531,49 @@ export default function App() {
           <span>
             {columns.mesa ? `${countMesas(active)} mesas · ` : ""}
             {active.rows.length} strings
-            {" · "}Enter desce · setas movem · Ctrl+Z desfaz
           </span>
+        </div>
+        <div className="criteria">
+          <label>
+            Voc esperada da string
+            <input
+              value={book.vocEsperada}
+              placeholder="Ex.: 1000"
+              onChange={(e) => patchHeader({ vocEsperada: e.target.value })}
+            />
+          </label>
+          <label>
+            Erro ± (%)
+            <input
+              value={book.erroPercentual}
+              placeholder="Ex.: 5"
+              inputMode="decimal"
+              onChange={(e) => patchHeader({ erroPercentual: e.target.value })}
+            />
+          </label>
+          <label>
+            Tensão do módulo
+            <input
+              value={book.tensaoModulo}
+              placeholder="Ex.: 45,6V"
+              onChange={(e) => patchHeader({ tensaoModulo: e.target.value })}
+            />
+          </label>
+          <label>
+            Isolação
+            <select
+              value={book.criterioIsolacao}
+              onChange={(e) =>
+                patchHeader({ criterioIsolacao: e.target.value as IsolationCriterion })
+              }
+            >
+              {ISOLATION_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="actions">
           {columns.mesa && (
@@ -554,19 +615,21 @@ export default function App() {
                   </th>
                 );
               })}
+              <th className="group result-h">Resultado</th>
               <th className="no-print" />
             </tr>
             <tr>
               {vis.map((column) => (
                 <th key={column.id}>{column.label}</th>
               ))}
+              <th>Aprov.</th>
               <th className="no-print" />
             </tr>
           </thead>
           {active.rows.length === 0 ? (
             <tbody>
               <tr>
-                <td colSpan={vis.length + 1} className="empty">
+                <td colSpan={vis.length + 2} className="empty">
                   Nenhuma linha neste inversor. Clique em{" "}
                   <strong>{columns.mesa ? "Adicionar mesa" : "Adicionar string"}</strong>{" "}
                   para começar. As células entram vazias para você preencher no campo.
@@ -577,6 +640,7 @@ export default function App() {
               <SheetGrid
                 rows={active.rows}
                 columns={vis.map((column) => column.id)}
+                verdicts={verdicts}
                 onRowsChange={replaceActiveRows}
                 onRemove={(rowId) => mutateActive((inverter) => removeRow(inverter, rowId))}
                 onUndo={undo}
@@ -593,8 +657,8 @@ export default function App() {
           {filePath ? ` · ${filePath}` : ` · ${suggestedFileName(book)}`}
         </span>
         <span>
-          Total: {stats.mesas} mesas · {stats.strings} strings · Polaridade Ok {stats.ok}
-          {stats.nok ? ` · Nok ${stats.nok}` : ""}
+          Total: {stats.mesas} mesas · {stats.strings} strings · Aprovadas {stats.pass}
+          {stats.fail ? ` · Reprovadas ${stats.fail}` : ""}
         </span>
         {recent.length > 0 && (
           <span className="recent">Recentes: {recent.slice(0, 3).join(" · ")}</span>
@@ -677,8 +741,8 @@ export default function App() {
           >
             <h2 id="config-title">Configuração da planilha</h2>
             <p className="modal-hint">
-              Por padrão todos os campos vêm ligados. Desmarque o que não usar — usina pequena pode
-              ficar sem mesa.
+              Por padrão todos os campos vêm ligados, menos TΩ. Desmarcar Tensão aplicada esconde
+              também Tempo, MΩ, GΩ e TΩ.
             </p>
             <div className="modal-actions" style={{ marginBottom: 12 }}>
               <button type="button" onClick={() => setDraftColumns({ ...DEFAULT_COLUMNS })}>
@@ -696,12 +760,24 @@ export default function App() {
                     <input
                       type="checkbox"
                       checked={draftColumns[column.id]}
-                      onChange={(e) =>
-                        setDraftColumns((current) => ({
-                          ...current,
-                          [column.id]: e.target.checked,
-                        }))
-                      }
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setDraftColumns((current) => {
+                          if (column.id === "tensaoAplicada" && !checked) {
+                            return applyIsolationCoupling({ ...current, tensaoAplicada: false });
+                          }
+                          if (column.id === "tensaoAplicada" && checked) {
+                            return {
+                              ...current,
+                              tensaoAplicada: true,
+                              isolamentoTempo: true,
+                              isolamentoMohm: true,
+                              isolamentoGohm: true,
+                            };
+                          }
+                          return { ...current, [column.id]: checked };
+                        });
+                      }}
                     />
                     {column.label}
                   </label>

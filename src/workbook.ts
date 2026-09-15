@@ -1,6 +1,7 @@
 import { DEFAULT_COLUMNS, normalizeColumns, type ColumnConfig } from "./columns";
 import type { Inverter, Polaridade, TestRow, Workbook } from "./types";
 import { FILE_VERSION } from "./types";
+import { parseCriterion } from "./verdict";
 
 export function uid(prefix = "id"): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -32,6 +33,7 @@ export function emptyRow(overrides: Partial<TestRow> = {}): TestRow {
     isolamentoTempo: "",
     isolamentoMohm: "",
     isolamentoGohm: "",
+    isolamentoTohm: "",
     ...overrides,
   };
 }
@@ -55,17 +57,31 @@ export function createEmptyWorkbook(): Workbook {
     temperatura: "",
     tecnico: "",
     observacoes: "",
+    endereco: "",
+    vocEsperada: "",
+    erroPercentual: "",
+    tensaoModulo: "",
+    criterioIsolacao: "nbr5410",
     columns: { ...DEFAULT_COLUMNS },
     inverters,
     activeInverterId: inverters[0].id,
   };
 }
 
+function copiedIsolation(inverter: Inverter): Pick<TestRow, "tensaoAplicada" | "isolamentoTempo"> {
+  const last = inverter.rows[inverter.rows.length - 1];
+  return {
+    tensaoAplicada: last?.tensaoAplicada ?? "",
+    isolamentoTempo: last?.isolamentoTempo ?? "",
+  };
+}
+
 export function addMesa(inverter: Inverter, mesaLabel: string, strings = 2): Inverter {
   const count = Math.max(1, Math.min(50, Math.trunc(Number(strings)) || 2));
+  const copied = copiedIsolation(inverter);
   const rows = [...inverter.rows];
   for (let i = 0; i < count; i += 1) {
-    rows.push(emptyRow({ mesa: mesaLabel.trim() }));
+    rows.push(emptyRow({ mesa: mesaLabel.trim(), ...copied }));
   }
   return { ...inverter, rows };
 }
@@ -78,6 +94,7 @@ export function addString(inverter: Inverter, copyMesa = true): Inverter {
       ...inverter.rows,
       emptyRow({
         mesa: copyMesa ? last?.mesa ?? "" : "",
+        ...copiedIsolation(inverter),
       }),
     ],
   };
@@ -143,6 +160,11 @@ export function parseWorkbook(raw: string): Workbook {
     temperatura: String(data.temperatura ?? ""),
     tecnico: String(data.tecnico ?? ""),
     observacoes: String(data.observacoes ?? ""),
+    endereco: String(data.endereco ?? ""),
+    vocEsperada: String(data.vocEsperada ?? ""),
+    erroPercentual: String(data.erroPercentual ?? ""),
+    tensaoModulo: String(data.tensaoModulo ?? ""),
+    criterioIsolacao: parseCriterion(data.criterioIsolacao),
     columns: normalizeColumns(data.columns as Partial<ColumnConfig> | undefined),
     inverters,
     activeInverterId: active,
@@ -179,7 +201,8 @@ export function inverterHasData(inverter: Inverter): boolean {
       row.flutPositivo.trim() ||
       row.flutNegativo.trim() ||
       row.isolamentoMohm.trim() ||
-      row.isolamentoGohm.trim()
+      row.isolamentoGohm.trim() ||
+      row.isolamentoTohm.trim()
     ) {
       return true;
     }
@@ -221,6 +244,9 @@ export function createExampleWorkbook(): Workbook {
     data: "2026-08-25",
     umidade: "40.00",
     temperatura: "33",
+    vocEsperada: "1000",
+    erroPercentual: "5",
+    tensaoModulo: "46.7",
     inverters: [inv1, inv2, book.inverters[2], inv4],
     activeInverterId: inv1.id,
   };
@@ -253,6 +279,7 @@ function normalizeRow(input: Partial<TestRow>): TestRow {
     isolamentoTempo: String(input.isolamentoTempo ?? ""),
     isolamentoMohm: String(input.isolamentoMohm ?? ""),
     isolamentoGohm: String(input.isolamentoGohm ?? ""),
+    isolamentoTohm: String(input.isolamentoTohm ?? ""),
   });
 }
 

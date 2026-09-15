@@ -1,5 +1,12 @@
 export type Polaridade = "" | "Ok" | "Nok";
 
+export type IsolationCriterion =
+  | "nbr5410"
+  | "nbr16690_small"
+  | "nbr16690_medium"
+  | "nbr16690_large"
+  | "selv_pelv";
+
 export type ColumnId =
   | "mesa"
   | "stringNo"
@@ -12,7 +19,8 @@ export type ColumnId =
   | "tensaoAplicada"
   | "isolamentoTempo"
   | "isolamentoMohm"
-  | "isolamentoGohm";
+  | "isolamentoGohm"
+  | "isolamentoTohm";
 
 export type ColumnConfig = Record<ColumnId, boolean>;
 
@@ -30,6 +38,7 @@ export interface TestRow {
   isolamentoTempo: string;
   isolamentoMohm: string;
   isolamentoGohm: string;
+  isolamentoTohm: string;
 }
 
 export interface Inverter {
@@ -46,6 +55,11 @@ export interface Workbook {
   temperatura: string;
   tecnico: string;
   observacoes: string;
+  endereco: string;
+  vocEsperada: string;
+  erroPercentual: string;
+  tensaoModulo: string;
+  criterioIsolacao: IsolationCriterion;
   columns: ColumnConfig;
   inverters: Inverter[];
   activeInverterId: string;

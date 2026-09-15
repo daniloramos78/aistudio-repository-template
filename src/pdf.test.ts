@@ -28,6 +28,7 @@ describe("pdf", () => {
         isolamentoTempo: true,
         isolamentoMohm: true,
         isolamentoGohm: true,
+        isolamentoTohm: false,
       },
     };
     const bytes = buildPdf(book);

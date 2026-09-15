@@ -77,5 +77,18 @@ describe("workbook", () => {
     const restored = parseWorkbook(JSON.stringify(raw));
     expect(restored.columns.mesa).toBe(true);
     expect(restored.columns.mppt).toBe(true);
+    expect(restored.endereco).toBe("");
+    expect(restored.criterioIsolacao).toBe("nbr5410");
+    expect(restored.columns.isolamentoTohm).toBe(false);
+  });
+
+  it("copies tensão aplicada and tempo from the previous row", () => {
+    const first = addString(createEmptyWorkbook().inverters[0], false);
+    first.rows[0].tensaoAplicada = "1kV";
+    first.rows[0].isolamentoTempo = "60s";
+    const next = addString(first, false);
+    expect(next.rows[1].tensaoAplicada).toBe("1kV");
+    expect(next.rows[1].isolamentoTempo).toBe("60s");
+    expect(next.rows[1].stringNo).toBe("");
   });
 });

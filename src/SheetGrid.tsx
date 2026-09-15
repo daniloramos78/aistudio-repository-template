@@ -10,10 +10,12 @@ import { isFirstOfMesa } from "./workbook";
 import { rowValue, type ColumnId } from "./columns";
 import { isRedoKey, isUndoKey, keyMove, moveCell, type CellPos } from "./sheetKeys";
 import type { Polaridade, TestRow } from "./types";
+import { verdictLabel, type Verdict } from "./verdict";
 
 interface SheetGridProps {
   rows: TestRow[];
   columns: ColumnId[];
+  verdicts: Verdict[];
   onRowsChange: (mutate: (rows: TestRow[]) => TestRow[], recordHistory?: boolean) => void;
   onRemove: (rowId: string) => void;
   onUndo: () => void;
@@ -23,6 +25,7 @@ interface SheetGridProps {
 export default function SheetGrid({
   rows,
   columns,
+  verdicts,
   onRowsChange,
   onRemove,
   onUndo,
@@ -85,6 +88,11 @@ export default function SheetGrid({
               onRedo={onRedo}
             />
           ))}
+          <td className={`verdict ${verdicts[rowIndex] ?? "pending"}`} title={verdictLabel(verdicts[rowIndex] ?? "pending")}>
+            <span className="verdict-dot" aria-label={verdictLabel(verdicts[rowIndex] ?? "pending")}>
+              {(verdicts[rowIndex] ?? "pending") === "pass" ? "✓" : (verdicts[rowIndex] ?? "pending") === "fail" ? "✕" : "•"}
+            </span>
+          </td>
           <td className="no-print">
             <button type="button" className="row-x" onClick={() => onRemove(row.id)} title="Excluir linha">
               ×

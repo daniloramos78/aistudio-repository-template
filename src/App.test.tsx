@@ -285,4 +285,45 @@ describe("App grid", () => {
     expect(headers).toContain("String");
     expect(headers).toContain("MPPT");
   });
+
+  it("places Adicionar inversor next to Adicionar string and not in the tabs", () => {
+    const tabs = host.querySelector(".tabs") as HTMLElement;
+    expect(Array.from(tabs.querySelectorAll("button")).map((button) => button.textContent)).not.toContain("+ Inversor");
+    const actions = Array.from(host.querySelectorAll(".sheet-toolbar .actions button")).map(
+      (button) => button.textContent,
+    );
+    expect(actions).toEqual(["Adicionar mesa", "Adicionar inversor", "Adicionar string"]);
+    const before = host.querySelectorAll(".tabs .tab").length;
+    const addInv = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar inversor",
+    );
+    click(addInv!);
+    expect(host.querySelectorAll(".tabs .tab")).toHaveLength(before + 1);
+    expect(host.textContent).toContain("INVERSOR_05");
+  });
+
+  it("records multimeter and megohmmeter identification in Instrumentos", () => {
+    const open = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Instrumentos",
+    );
+    click(open!);
+    const dialog = host.querySelector('[aria-labelledby="instruments-title"]') as HTMLElement;
+    expect(dialog.textContent).toContain("Multímetro / alicate amperímetro");
+    expect(dialog.textContent).toContain("Megômetro");
+    expect(dialog.textContent).toContain("Número de série");
+    expect(dialog.textContent).toMatch(/certificado/i);
+    expect(dialog.textContent).toContain("Validade");
+
+    const first = dialog.querySelector("input") as HTMLInputElement;
+    typeInto(first, "Fluke 87V");
+    act(() => { first.blur(); });
+    expect(first.value).toBe("Fluke 87V");
+
+    const close = Array.from(dialog.querySelectorAll("button")).find(
+      (button) => button.textContent === "Fechar",
+    );
+    click(close!);
+    expect(host.querySelector('[aria-labelledby="instruments-title"]')).toBeNull();
+    expect(host.textContent).toContain("Instrumentos ✓");
+  });
 });

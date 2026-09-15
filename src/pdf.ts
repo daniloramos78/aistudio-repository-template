@@ -11,6 +11,7 @@ import {
 } from "./columns";
 import type { Workbook } from "./types";
 import { evaluateRow, verdictLabel } from "./verdict";
+import { instrumentHasData, instrumentLine } from "./workbook";
 import dejaVuBold from "./fonts/DejaVuSansOhm-Bold.ttf?inline";
 import dejaVuRegular from "./fonts/DejaVuSansOhm.ttf?inline";
 
@@ -37,6 +38,28 @@ function fmtDate(iso: string): string {
   return iso;
 }
 
+export function pdfHeaderNotes(workbook: Workbook): string[] {
+  const extra = [
+    workbook.endereco ? `Endereço: ${workbook.endereco}` : "",
+    workbook.vocEsperada ? `Voc esp.: ${workbook.vocEsperada}` : "",
+    workbook.erroPercentual ? `Erro ±: ${workbook.erroPercentual}%` : "",
+    workbook.tensaoModulo ? `Módulo: ${workbook.tensaoModulo}` : "",
+  ].filter(Boolean);
+  const who = [
+    workbook.tecnico ? `Técnico: ${workbook.tecnico}` : "",
+    workbook.observacoes ? `Observações: ${workbook.observacoes}` : "",
+  ].filter(Boolean);
+  const instruments = [
+    instrumentHasData(workbook.multimetro)
+      ? instrumentLine("Multímetro/alicate", workbook.multimetro)
+      : "",
+    instrumentHasData(workbook.megometro)
+      ? instrumentLine("Megômetro", workbook.megometro)
+      : "",
+  ].filter(Boolean);
+  return [...extra, who.join("  ·  "), ...instruments].filter(Boolean);
+}
+
 export function buildPdf(workbook: Workbook): Uint8Array {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   registerOhmFont(doc);
@@ -53,30 +76,20 @@ export function buildPdf(workbook: Workbook): Uint8Array {
 
     doc.setFont(FONT, "normal");
     doc.setFontSize(10);
-    doc.text(`UFV: ${workbook.ufv || "—"}`, margin, 19);
-    doc.text(`Data: ${fmtDate(workbook.data) || "—"}`, 80, 19);
-    doc.text(`Umidade: ${workbook.umidade ? `${workbook.umidade}%` : "—"}`, 130, 19);
-    doc.text(`Temperatura: ${workbook.temperatura ? `${workbook.temperatura}°C` : "—"}`, 185, 19);
-    doc.text(inverter.name, 250, 19, { align: "right" });
+    doc.text(`UFV: ${workbook.ufv || "—"}`, margin, 18);
+    doc.text(`Data: ${fmtDate(workbook.data) || "—"}`, 80, 18);
+    doc.text(`Umidade: ${workbook.umidade ? `${workbook.umidade}%` : "—"}`, 130, 18);
+    doc.text(`Temperatura: ${workbook.temperatura ? `${workbook.temperatura}°C` : "—"}`, 185, 18);
+    doc.text(inverter.name, 250, 18, { align: "right" });
 
     doc.setFontSize(8);
-    const extra = [
-      workbook.endereco ? `Endereço: ${workbook.endereco}` : "",
-      workbook.vocEsperada ? `Voc esp.: ${workbook.vocEsperada}` : "",
-      workbook.erroPercentual ? `Erro ±: ${workbook.erroPercentual}%` : "",
-      workbook.tensaoModulo ? `Módulo: ${workbook.tensaoModulo}` : "",
-    ].filter(Boolean);
-    if (extra.length) {
-      doc.text(extra.join("  ·  "), margin, 25);
-    }
-    if (workbook.tecnico) {
-      doc.text(`Técnico: ${workbook.tecnico}`, margin, extra.length ? 30 : 25);
-    }
-    if (workbook.observacoes) {
-      doc.text(`Observações: ${workbook.observacoes}`, 80, extra.length ? 30 : 25);
+    let y = 23;
+    for (const line of pdfHeaderNotes(workbook)) {
+      doc.text(line, margin, y);
+      y += 4.5;
     }
 
-    const headOffset = extra.length || workbook.tecnico || workbook.observacoes ? 34 : 28;
+    const headOffset = y + 2;
 
     autoTable(doc, {
       startY: headOffset,

@@ -3,6 +3,7 @@ import { isDemoPage } from "./demo";
 import { buildPdf } from "./pdf";
 import { openWorkbookFile, savePdfFile, saveWorkbookFile } from "./platform";
 import FieldInput from "./FieldInput";
+import InstrumentsModal from "./InstrumentsModal";
 import SheetGrid from "./SheetGrid";
 import { isRedoKey, isUndoKey } from "./sheetKeys";
 import type { Inverter, IsolationCriterion, TestRow, Workbook } from "./types";
@@ -27,6 +28,7 @@ import {
   createExampleWorkbook,
   emptyInverter,
   fileTitle,
+  instrumentHasData,
   inverterHasData,
   inverterNameFromNumber,
   inverterNumberFromName,
@@ -54,6 +56,7 @@ export default function App() {
   const [editName, setEditName] = useState("");
   const [editNumber, setEditNumber] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
+  const [instrumentsOpen, setInstrumentsOpen] = useState(false);
   const [draftColumns, setDraftColumns] = useState<ColumnConfig>(DEFAULT_COLUMNS);
   const [mesaOpen, setMesaOpen] = useState(false);
   const [mesaName, setMesaName] = useState("");
@@ -285,6 +288,16 @@ export default function App() {
     mark((current) => ({ ...current, ...patch }));
   }, [mark]);
 
+  const patchInstrument = (
+    which: "multimetro" | "megometro",
+    patch: Partial<Workbook["multimetro"]>,
+  ) => {
+    mark((current) => ({
+      ...current,
+      [which]: { ...current[which], ...patch },
+    }));
+  };
+
   const mutateActive = useCallback((fn: (inverter: Inverter) => Inverter, message?: string) => {
     mark((current) => {
       rememberBook(current);
@@ -440,6 +453,14 @@ export default function App() {
           <button
             type="button"
             className="ghost"
+            onClick={() => setInstrumentsOpen(true)}
+          >
+            Instrumentos
+            {instrumentHasData(book.multimetro) || instrumentHasData(book.megometro) ? " ✓" : ""}
+          </button>
+          <button
+            type="button"
+            className="ghost"
             onClick={() => {
               setDraftColumns(columns);
               setConfigOpen(true);
@@ -532,9 +553,6 @@ export default function App() {
             )}
           </div>
         ))}
-        <button type="button" className="tab add" onClick={addInverter}>
-          + Inversor
-        </button>
       </nav>
 
       <section className="sheet-toolbar no-print">
@@ -600,6 +618,9 @@ export default function App() {
               Adicionar mesa
             </button>
           )}
+          <button type="button" onClick={addInverter}>
+            Adicionar inversor
+          </button>
           <button
             type="button"
             onClick={() =>
@@ -682,6 +703,18 @@ export default function App() {
         <p>
           {book.ufv || "UFV não informada"} · {fileTitle(book)}
         </p>
+        {(instrumentHasData(book.multimetro) || instrumentHasData(book.megometro)) && (
+          <p>
+            {[
+              instrumentHasData(book.multimetro)
+                ? `Multímetro/alicate: ${book.multimetro.fabricanteModelo || "—"}`
+                : "",
+              instrumentHasData(book.megometro)
+                ? `Megômetro: ${book.megometro.fabricanteModelo || "—"}`
+                : "",
+            ].filter(Boolean).join(" · ")}
+          </p>
+        )}
       </section>
 
       {editing && (
@@ -742,6 +775,14 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <InstrumentsModal
+        open={instrumentsOpen}
+        multimetro={book.multimetro}
+        megometro={book.megometro}
+        onClose={() => setInstrumentsOpen(false)}
+        onChange={patchInstrument}
+      />
 
       {configOpen && (
         <div className="modal-backdrop no-print" onClick={() => setConfigOpen(false)}>

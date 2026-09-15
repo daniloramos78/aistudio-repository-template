@@ -1,5 +1,5 @@
 import { DEFAULT_COLUMNS, normalizeColumns, type ColumnConfig } from "./columns";
-import type { Inverter, Polaridade, TestRow, Workbook } from "./types";
+import type { Inverter, Polaridade, TestInstrument, TestRow, Workbook } from "./types";
 import { FILE_VERSION } from "./types";
 import { parseCriterion } from "./verdict";
 
@@ -47,6 +47,55 @@ export function emptyInverter(index: number): Inverter {
   };
 }
 
+export function emptyInstrument(): TestInstrument {
+  return {
+    fabricanteModelo: "",
+    numeroSerie: "",
+    patrimonio: "",
+    certificadoCalibracao: "",
+    dataCalibracao: "",
+    validadeCalibracao: "",
+  };
+}
+
+export function instrumentHasData(instrument: TestInstrument | undefined): boolean {
+  if (!instrument) return false;
+  return Object.values(instrument).some((value) => String(value).trim());
+}
+
+export function instrumentLine(label: string, instrument: TestInstrument): string {
+  const parts = [
+    instrument.fabricanteModelo.trim(),
+    instrument.numeroSerie.trim() ? `S/N ${instrument.numeroSerie.trim()}` : "",
+    instrument.patrimonio.trim() ? `Patrimônio ${instrument.patrimonio.trim()}` : "",
+    instrument.certificadoCalibracao.trim() ? `Cert. ${instrument.certificadoCalibracao.trim()}` : "",
+    instrument.dataCalibracao.trim() ? `Cal. ${formatIsoDate(instrument.dataCalibracao)}` : "",
+    instrument.validadeCalibracao.trim() ? `Val. ${formatIsoDate(instrument.validadeCalibracao)}` : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return "";
+  return `${label}: ${parts.join(" · ")}`;
+}
+
+export function formatIsoDate(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (y && m && d) return `${d}/${m}/${y}`;
+  return iso;
+}
+
+function normalizeInstrument(input: Partial<TestInstrument> | undefined): TestInstrument {
+  const empty = emptyInstrument();
+  if (!input || typeof input !== "object") return empty;
+  return {
+    fabricanteModelo: String(input.fabricanteModelo ?? ""),
+    numeroSerie: String(input.numeroSerie ?? ""),
+    patrimonio: String(input.patrimonio ?? ""),
+    certificadoCalibracao: String(input.certificadoCalibracao ?? ""),
+    dataCalibracao: String(input.dataCalibracao ?? ""),
+    validadeCalibracao: String(input.validadeCalibracao ?? ""),
+  };
+}
+
 export function createEmptyWorkbook(): Workbook {
   const inverters = [1, 2, 3, 4].map((n) => emptyInverter(n));
   return {
@@ -65,6 +114,8 @@ export function createEmptyWorkbook(): Workbook {
     columns: { ...DEFAULT_COLUMNS },
     inverters,
     activeInverterId: inverters[0].id,
+    multimetro: emptyInstrument(),
+    megometro: emptyInstrument(),
   };
 }
 
@@ -195,6 +246,8 @@ export function parseWorkbook(raw: string): Workbook {
     columns: normalizeColumns(data.columns as Partial<ColumnConfig> | undefined),
     inverters,
     activeInverterId: active,
+    multimetro: normalizeInstrument(data.multimetro),
+    megometro: normalizeInstrument(data.megometro),
   };
 }
 
@@ -276,6 +329,22 @@ export function createExampleWorkbook(): Workbook {
     tensaoModulo: "46.7",
     inverters: [inv1, inv2, book.inverters[2], inv4],
     activeInverterId: inv1.id,
+    multimetro: {
+      fabricanteModelo: "Fluke 87V",
+      numeroSerie: "36581234",
+      patrimonio: "PAT-MM-014",
+      certificadoCalibracao: "RBC-2026-118",
+      dataCalibracao: "2026-02-10",
+      validadeCalibracao: "2027-02-10",
+    },
+    megometro: {
+      fabricanteModelo: "Fluke 1550C",
+      numeroSerie: "44190217",
+      patrimonio: "PAT-MG-003",
+      certificadoCalibracao: "RBC-2026-204",
+      dataCalibracao: "2026-03-04",
+      validadeCalibracao: "2027-03-04",
+    },
   };
 }
 

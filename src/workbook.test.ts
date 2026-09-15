@@ -110,4 +110,23 @@ describe("workbook", () => {
     expect(rows[1].tensaoAplicada).toBe("1kV");
     expect(rows[1].isolamentoTempo).toBe("");
   });
+
+  it("restores empty instruments when the saved file predates that section", () => {
+    const raw = JSON.parse(serializeWorkbook(createEmptyWorkbook())) as Record<string, unknown>;
+    delete raw.multimetro;
+    delete raw.megometro;
+    const restored = parseWorkbook(JSON.stringify(raw));
+    expect(restored.multimetro.fabricanteModelo).toBe("");
+    expect(restored.megometro.numeroSerie).toBe("");
+    expect(restored.megometro.validadeCalibracao).toBe("");
+  });
+
+  it("keeps example instrument identification", () => {
+    const example = createExampleWorkbook();
+    expect(example.multimetro.fabricanteModelo).toBe("Fluke 87V");
+    expect(example.megometro.certificadoCalibracao).toMatch(/RBC/);
+    const restored = parseWorkbook(serializeWorkbook(example));
+    expect(restored.multimetro.numeroSerie).toBe("36581234");
+    expect(restored.megometro.validadeCalibracao).toBe("2027-03-04");
+  });
 });

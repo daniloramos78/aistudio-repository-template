@@ -47,6 +47,15 @@ export interface Inverter {
   rows: TestRow[];
 }
 
+export interface TestInstrument {
+  fabricanteModelo: string;
+  numeroSerie: string;
+  patrimonio: string;
+  certificadoCalibracao: string;
+  dataCalibracao: string;
+  validadeCalibracao: string;
+}
+
 export interface Workbook {
   version: 1;
   ufv: string;
@@ -63,6 +72,8 @@ export interface Workbook {
   columns: ColumnConfig;
   inverters: Inverter[];
   activeInverterId: string;
+  multimetro: TestInstrument;
+  megometro: TestInstrument;
 }
 
 export const FILE_VERSION = 1 as const;

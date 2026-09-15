@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isDemoPage } from "./demo";
 import { buildPdf } from "./pdf";
 import { openWorkbookFile, savePdfFile, saveWorkbookFile } from "./platform";
+import SheetGrid from "./SheetGrid";
+import { isRedoKey, isUndoKey } from "./sheetKeys";
 import type { Inverter, TestRow, Workbook } from "./types";
 import { DRAFT_KEY, RECENT_KEY } from "./types";
 import {
@@ -11,11 +13,9 @@ import {
   SMALL_PLANT_COLUMNS,
   groupSpan,
   normalizeColumns,
-  rowValue,
   visibleColumns,
   type ColumnConfig,
   type ColumnGroup,
-  type ColumnId,
 } from "./columns";
 import {
   addMesa,
@@ -28,12 +28,10 @@ import {
   inverterHasData,
   inverterNameFromNumber,
   inverterNumberFromName,
-  isFirstOfMesa,
   parseWorkbook,
   removeRow,
   serializeWorkbook,
   suggestedFileName,
-  updateRow,
 } from "./workbook";
 
 type Status = { kind: "ok" | "warn" | "err"; text: string };
@@ -59,9 +57,45 @@ export default function App() {
   const [mesaCount, setMesaCount] = useState("2");
   const [demo] = useState(() => isDemoPage());
   const snapshot = useRef(serializeWorkbook(emptyDraft));
+  const past = useRef<string[]>([]);
+  const future = useRef<string[]>([]);
 
   const active = book.inverters.find((inv) => inv.id === book.activeInverterId)
     ?? book.inverters[0];
+
+  const rememberBook = (current: Workbook) => {
+    past.current.push(serializeWorkbook(current));
+    if (past.current.length > 100) past.current.shift();
+    future.current = [];
+  };
+
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) {
+      setStatus({ kind: "warn", text: "Nada para desfazer" });
+      return;
+    }
+    setBook((current) => {
+      future.current.push(serializeWorkbook(current));
+      return parseWorkbook(prev);
+    });
+    setDirty(true);
+    setStatus({ kind: "ok", text: "Desfeito" });
+  }, []);
+
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) {
+      setStatus({ kind: "warn", text: "Nada para refazer" });
+      return;
+    }
+    setBook((current) => {
+      past.current.push(serializeWorkbook(current));
+      return parseWorkbook(next);
+    });
+    setDirty(true);
+    setStatus({ kind: "ok", text: "Refeito" });
+  }, []);
 
   const mark = useCallback((
     next: Workbook | ((current: Workbook) => Workbook),
@@ -117,6 +151,24 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inModal = Boolean(target?.closest(".modal"));
+      const inHeader = Boolean(target?.closest(".meta"));
+      const inSheet = Boolean(target?.closest("[data-sheet-cell]"));
+
+      if (isUndoKey(event) && !inModal && !inHeader) {
+        if (inSheet) return;
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if (isRedoKey(event) && !inModal && !inHeader) {
+        if (inSheet) return;
+        event.preventDefault();
+        redo();
+        return;
+      }
+
       const ctrl = event.ctrlKey || event.metaKey;
       if (!ctrl) return;
       if (event.key.toLowerCase() === "s") {
@@ -149,6 +201,8 @@ export default function App() {
     if (!confirmDiscard()) return;
     const next = createEmptyWorkbook();
     snapshot.current = serializeWorkbook(next);
+    past.current = [];
+    future.current = [];
     setBook(next);
     setFilePath(null);
     setDirty(false);
@@ -160,6 +214,8 @@ export default function App() {
     if (!confirmDiscard()) return;
     const next = createExampleWorkbook();
     snapshot.current = serializeWorkbook(next);
+    past.current = [];
+    future.current = [];
     setBook(next);
     setFilePath(null);
     setDirty(true);
@@ -173,6 +229,8 @@ export default function App() {
       if (!opened) return;
       const next = parseWorkbook(opened.contents);
       snapshot.current = serializeWorkbook(next);
+      past.current = [];
+      future.current = [];
       setBook(next);
       setFilePath(opened.filePath);
       setDirty(false);
@@ -226,6 +284,7 @@ export default function App() {
 
   const mutateActive = (fn: (inverter: Inverter) => Inverter, message?: string) => {
     mark((current) => {
+      rememberBook(current);
       const inverter =
         current.inverters.find((item) => item.id === current.activeInverterId)
         ?? current.inverters[0];
@@ -238,6 +297,27 @@ export default function App() {
     }, message);
   };
 
+  const replaceActiveRows = (
+    mutate: (rows: TestRow[]) => TestRow[],
+    recordHistory = true,
+  ) => {
+    setBook((current) => {
+      const inverter =
+        current.inverters.find((item) => item.id === current.activeInverterId)
+        ?? current.inverters[0];
+      const nextRows = mutate(inverter.rows);
+      if (nextRows === inverter.rows) return current;
+      if (recordHistory) rememberBook(current);
+      return {
+        ...current,
+        inverters: current.inverters.map((item) =>
+          item.id === inverter.id ? { ...item, rows: nextRows } : item,
+        ),
+      };
+    });
+    setDirty(true);
+  };
+
   const submitMesa = () => {
     mutateActive(
       (inverter) => addMesa(inverter, mesaName, Number(mesaCount) || 2),
@@ -247,12 +327,16 @@ export default function App() {
   };
 
   const addInverter = () => {
-    const next = emptyInverter(book.inverters.length + 1);
-    mark({
-      ...book,
-      inverters: [...book.inverters, next],
-      activeInverterId: next.id,
-    }, `${next.name} adicionado`);
+    const nextInv = emptyInverter(book.inverters.length + 1);
+    mark((current) => {
+      rememberBook(current);
+      const created = emptyInverter(current.inverters.length + 1);
+      return {
+        ...current,
+        inverters: [...current.inverters, created],
+        activeInverterId: created.id,
+      };
+    }, `${nextInv.name} adicionado`);
   };
 
   const removeInverter = (id: string) => {
@@ -427,6 +511,7 @@ export default function App() {
           <span>
             {columns.mesa ? `${countMesas(active)} mesas · ` : ""}
             {active.rows.length} strings
+            {" · "}Enter desce · setas movem · Ctrl+Z desfaz
           </span>
         </div>
         <div className="actions">
@@ -447,7 +532,7 @@ export default function App() {
             onClick={() =>
               mutateActive(
                 (inverter) => addString(inverter, columns.mesa),
-                "String vazia adicionada — clique na célula para preencher",
+                "String vazia adicionada — clique na célula e digite",
               )
             }
           >
@@ -478,8 +563,8 @@ export default function App() {
               <th className="no-print" />
             </tr>
           </thead>
-          <tbody>
-            {active.rows.length === 0 ? (
+          {active.rows.length === 0 ? (
+            <tbody>
               <tr>
                 <td colSpan={vis.length + 1} className="empty">
                   Nenhuma linha neste inversor. Clique em{" "}
@@ -487,21 +572,17 @@ export default function App() {
                   para começar. As células entram vazias para você preencher no campo.
                 </td>
               </tr>
-            ) : (
-              active.rows.map((row, index) => (
-                <GridRow
-                  key={row.id}
-                  row={row}
-                  columns={vis.map((column) => column.id)}
-                  first={isFirstOfMesa(active.rows, index)}
-                  onChange={(patch) =>
-                    mutateActive((inverter) => updateRow(inverter, row.id, patch))
-                  }
-                  onRemove={() => mutateActive((inverter) => removeRow(inverter, row.id))}
-                />
-              ))
-            )}
-          </tbody>
+            </tbody>
+          ) : (
+              <SheetGrid
+                rows={active.rows}
+                columns={vis.map((column) => column.id)}
+                onRowsChange={replaceActiveRows}
+                onRemove={(rowId) => mutateActive((inverter) => removeRow(inverter, rowId))}
+                onUndo={undo}
+                onRedo={redo}
+              />
+          )}
         </table>
       </div>
 
@@ -633,7 +714,10 @@ export default function App() {
                 className="primary"
                 onClick={() => {
                   mark(
-                    (current) => ({ ...current, columns: normalizeColumns(draftColumns) }),
+                    (current) => {
+                      rememberBook(current);
+                      return { ...current, columns: normalizeColumns(draftColumns) };
+                    },
                     "Configuração da planilha atualizada",
                   );
                   setConfigOpen(false);
@@ -707,68 +791,3 @@ export default function App() {
   );
 }
 
-function GridRow({
-  row,
-  columns,
-  first,
-  onChange,
-  onRemove,
-}: {
-  row: TestRow;
-  columns: ColumnId[];
-  first: boolean;
-  onChange: (patch: Partial<TestRow>) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <tr>
-      {columns.map((id) => (
-        <GridCell key={id} id={id} row={row} first={first} onChange={onChange} />
-      ))}
-      <td className="no-print">
-        <button type="button" className="row-x" onClick={onRemove} title="Excluir linha">
-          ×
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-function GridCell({
-  id,
-  row,
-  first,
-  onChange,
-}: {
-  id: ColumnId;
-  row: TestRow;
-  first: boolean;
-  onChange: (patch: Partial<TestRow>) => void;
-}) {
-  if (id === "polaridade") {
-    return (
-      <td>
-        <select
-          value={row.polaridade}
-          onChange={(e) => onChange({ polaridade: e.target.value as TestRow["polaridade"] })}
-        >
-          <option value="" />
-          <option value="Ok">Ok</option>
-          <option value="Nok">Nok</option>
-        </select>
-      </td>
-    );
-  }
-  const className = id === "mesa" ? (first ? "mesa" : "mesa muted") : undefined;
-  return (
-    <td className={className}>
-      <input
-        value={rowValue(row, id)}
-        autoComplete="off"
-        spellCheck={false}
-        aria-label={id}
-        onChange={(e) => onChange({ [id]: e.target.value } as Partial<TestRow>)}
-      />
-    </td>
-  );
-}

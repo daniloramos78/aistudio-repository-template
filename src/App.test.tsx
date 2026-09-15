@@ -66,6 +66,37 @@ describe("App grid", () => {
     expect((host.querySelector('[aria-label="tensaoVoc"]') as HTMLInputElement).value).toBe("1002V");
   });
 
+  it("moves to the cell below with Enter and undoes the value with Ctrl+Z", () => {
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    click(addString!);
+
+    const mesas = () => Array.from(host.querySelectorAll('[aria-label="mesa"]')) as HTMLInputElement[];
+    expect(mesas()).toHaveLength(2);
+    typeInto(mesas()[0], "Mesa 01");
+    act(() => {
+      mesas()[0].dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+    expect(mesas()[0].value).toBe("Mesa 01");
+    expect(document.activeElement).toBe(mesas()[1]);
+
+    act(() => {
+      mesas()[1].dispatchEvent(new KeyboardEvent("keydown", {
+        key: "z",
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+    expect(mesas()[0].value).toBe("");
+  });
+
   it("opens the mesa dialog instead of window.prompt", () => {
     const prompt = vi.fn();
     vi.stubGlobal("prompt", prompt);

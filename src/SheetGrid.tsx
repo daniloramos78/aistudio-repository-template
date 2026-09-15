@@ -1,0 +1,238 @@
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import { isFirstOfMesa } from "./workbook";
+import { rowValue, type ColumnId } from "./columns";
+import { isRedoKey, isUndoKey, keyMove, moveCell, type CellPos } from "./sheetKeys";
+import type { Polaridade, TestRow } from "./types";
+
+interface SheetGridProps {
+  rows: TestRow[];
+  columns: ColumnId[];
+  onRowsChange: (mutate: (rows: TestRow[]) => TestRow[], recordHistory?: boolean) => void;
+  onRemove: (rowId: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+}
+
+export default function SheetGrid({
+  rows,
+  columns,
+  onRowsChange,
+  onRemove,
+  onUndo,
+  onRedo,
+}: SheetGridProps) {
+  const [active, setActive] = useState<CellPos>({ row: 0, col: 0 });
+  const prevLen = useRef(rows.length);
+
+  useLayoutEffect(() => {
+    if (rows.length > prevLen.current) {
+      setActive({ row: prevLen.current, col: 0 });
+    } else if (rows.length > 0) {
+      setActive((pos) => {
+        const row = Math.min(pos.row, rows.length - 1);
+        const col = Math.min(pos.col, Math.max(0, columns.length - 1));
+        if (row === pos.row && col === pos.col) return pos;
+        return { row, col };
+      });
+    }
+    prevLen.current = rows.length;
+  }, [rows.length, columns.length]);
+
+  const go = useCallback((dir: NonNullable<ReturnType<typeof keyMove>>) => {
+    setActive((pos) => moveCell(pos, dir, rows.length, columns.length));
+  }, [rows.length, columns.length]);
+
+  const activate = useCallback((row: number, col: number) => {
+    setActive((pos) => (pos.row === row && pos.col === col ? pos : { row, col }));
+  }, []);
+
+  const commit = useCallback((rowId: string, columnId: ColumnId, value: string) => {
+    onRowsChange((current) => {
+      const row = current.find((item) => item.id === rowId);
+      if (!row || rowValue(row, columnId) === value) return current;
+      return current.map((item) =>
+        item.id === rowId ? { ...item, [columnId]: value } as TestRow : item,
+      );
+    }, true);
+  }, [onRowsChange]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <tbody>
+      {rows.map((row, rowIndex) => (
+        <tr key={row.id}>
+          {columns.map((columnId, colIndex) => (
+            <SheetCell
+              key={columnId}
+              row={row}
+              rowIndex={rowIndex}
+              columnId={columnId}
+              colIndex={colIndex}
+              first={isFirstOfMesa(rows, rowIndex)}
+              active={active.row === rowIndex && active.col === colIndex}
+              onActivate={() => activate(rowIndex, colIndex)}
+              onCommit={(value) => commit(row.id, columnId, value)}
+              onNavigate={go}
+              onUndo={onUndo}
+              onRedo={onRedo}
+            />
+          ))}
+          <td className="no-print">
+            <button type="button" className="row-x" onClick={() => onRemove(row.id)} title="Excluir linha">
+              ×
+            </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function SheetCell({
+  row,
+  rowIndex,
+  columnId,
+  colIndex,
+  first,
+  active,
+  onActivate,
+  onCommit,
+  onNavigate,
+  onUndo,
+  onRedo,
+}: {
+  row: TestRow;
+  rowIndex: number;
+  columnId: ColumnId;
+  colIndex: number;
+  first: boolean;
+  active: boolean;
+  onActivate: () => void;
+  onCommit: (value: string) => void;
+  onNavigate: (dir: NonNullable<ReturnType<typeof keyMove>>) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+}) {
+  const committed = rowValue(row, columnId);
+  const [text, setText] = useState(committed);
+  const committedRef = useRef(committed);
+  committedRef.current = committed;
+  const textRef = useRef(text);
+  textRef.current = text;
+  const inputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+
+  useEffect(() => {
+    setText(committed);
+  }, [committed]);
+
+  useLayoutEffect(() => {
+    if (!active) return;
+    const el = inputRef.current;
+    if (!el || document.activeElement === el) return;
+    el.focus();
+    if (el instanceof HTMLInputElement) el.select();
+  }, [active, rowIndex, colIndex]);
+
+  const flush = () => {
+    if (textRef.current !== committedRef.current) onCommit(textRef.current);
+  };
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
+    if (isUndoKey(event)) {
+      event.preventDefault();
+      if (textRef.current !== committedRef.current) {
+        setText(committedRef.current);
+        return;
+      }
+      onUndo();
+      return;
+    }
+    if (isRedoKey(event)) {
+      event.preventDefault();
+      onRedo();
+      return;
+    }
+    if (columnId === "polaridade" && !event.ctrlKey && !event.metaKey) {
+      const letter = event.key.toLowerCase();
+      if (letter === "o") {
+        event.preventDefault();
+        setText("Ok");
+        onCommit("Ok");
+        return;
+      }
+      if (letter === "n") {
+        event.preventDefault();
+        setText("Nok");
+        onCommit("Nok");
+        return;
+      }
+    }
+    const dir = keyMove(event);
+    if (!dir) return;
+    event.preventDefault();
+    flush();
+    onNavigate(dir);
+  };
+
+  const className = [
+    active ? "active-cell" : "",
+    columnId === "mesa" ? (first ? "mesa" : "mesa muted") : "",
+  ].filter(Boolean).join(" ") || undefined;
+
+  if (columnId === "polaridade") {
+    return (
+      <td className={className}>
+        <select
+          ref={(el) => {
+            inputRef.current = el;
+          }}
+          data-sheet-cell="1"
+          aria-label={columnId}
+          value={text}
+          onFocus={onActivate}
+          onChange={(event) => {
+            const value = event.target.value as Polaridade;
+            setText(value);
+            onCommit(value);
+          }}
+          onKeyDown={onKeyDown}
+        >
+          <option value="" />
+          <option value="Ok">Ok</option>
+          <option value="Nok">Nok</option>
+        </select>
+      </td>
+    );
+  }
+
+  return (
+    <td className={className} onMouseDown={onActivate}>
+      <input
+        ref={(el) => {
+          inputRef.current = el;
+        }}
+        type="text"
+        data-sheet-cell="1"
+        aria-label={columnId}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        value={text}
+        onFocus={onActivate}
+        onChange={(event) => setText(event.target.value)}
+        onInput={(event) => setText((event.target as HTMLInputElement).value)}
+        onBlur={flush}
+        onKeyDown={onKeyDown}
+      />
+    </td>
+  );
+}

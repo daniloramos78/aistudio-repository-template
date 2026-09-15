@@ -369,8 +369,8 @@ button, input, select {
   background: #fff;
 }
 
-.sheet td input:focus,
-.sheet td select:focus {
+.sheet td.active-cell input,
+.sheet td.active-cell select {
   outline: 2px solid var(--forest);
   outline-offset: -2px;
   background: #fff;

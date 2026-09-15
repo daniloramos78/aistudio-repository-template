@@ -1,8 +1,10 @@
 import {
-  useLayoutEffect,
+  useEffect,
   useRef,
+  useState,
   type FocusEventHandler,
   type InputHTMLAttributes,
+  type KeyboardEventHandler,
 } from "react";
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
@@ -11,25 +13,34 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> &
 };
 
 /**
- * Uncontrolled while focused so Electron/Chromium cannot wipe keystrokes
- * when the parent re-renders (the 1.2.0 sheet-cell bug).
+ * Controlled from local state while focused. The workbook only updates on blur
+ * (or Enter), so a parent re-render cannot wipe the keystroke — the 1.3.x
+ * Electron bug.
  */
 export default function FieldInput({
   value,
   onChange,
   onFocus,
   onBlur,
+  onKeyDown,
   ...props
 }: Props) {
-  const ref = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState(value);
   const focused = useRef(false);
+  const committed = useRef(value);
+  committed.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (focused.current || document.activeElement === el) return;
-    if (el.value !== value) el.value = value;
+  useEffect(() => {
+    if (focused.current) return;
+    setText(value);
   }, [value]);
+
+  const commit = (next: string) => {
+    setText(next);
+    if (next !== committed.current) onChangeRef.current(next);
+  };
 
   const handleFocus: FocusEventHandler<HTMLInputElement> = (event) => {
     focused.current = true;
@@ -38,23 +49,30 @@ export default function FieldInput({
 
   const handleBlur: FocusEventHandler<HTMLInputElement> = (event) => {
     focused.current = false;
-    onChange(event.target.value);
+    commit(event.target.value);
     onBlur?.(event);
+  };
+
+  const handleKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) => {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+    }
+    onKeyDown?.(event);
   };
 
   return (
     <input
       {...props}
-      ref={ref}
-      defaultValue={value}
+      value={text}
       autoComplete="off"
       autoCorrect="off"
       autoCapitalize="off"
       spellCheck={false}
       onFocus={handleFocus}
-      onInput={(event) => onChange(event.currentTarget.value)}
-      onChange={(event) => onChange(event.currentTarget.value)}
+      onChange={(event) => setText(event.target.value)}
+      onInput={(event) => setText(event.currentTarget.value)}
       onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
     />
   );
 }

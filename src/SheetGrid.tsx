@@ -1,5 +1,7 @@
 import {
+  memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -21,7 +23,7 @@ interface SheetGridProps {
   onRedo: () => void;
 }
 
-export default function SheetGrid({
+function SheetGrid({
   rows,
   columns,
   verdicts,
@@ -108,9 +110,7 @@ export default function SheetGrid({
 
 function SheetCell({
   row,
-  rowIndex,
   columnId,
-  colIndex,
   first,
   active,
   onActivate,
@@ -138,32 +138,23 @@ function SheetCell({
   const textRef = useRef(text);
   textRef.current = text;
   const focusedRef = useRef(false);
+  const wasActive = useRef(false);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
-  useLayoutEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    if (focusedRef.current || document.activeElement === el) return;
-    if (el.value !== committed) el.value = committed;
+  useEffect(() => {
+    if (focusedRef.current) return;
+    if (document.activeElement === inputRef.current) return;
     setText(committed);
   }, [committed]);
 
   useLayoutEffect(() => {
-    if (!active) return;
+    const becameActive = active && !wasActive.current;
+    wasActive.current = active;
+    if (!becameActive) return;
     const el = inputRef.current;
-    if (!el) return;
-    const current = document.activeElement;
-    if (current === el) return;
-    if (
-      current instanceof HTMLInputElement
-      || current instanceof HTMLSelectElement
-      || current instanceof HTMLTextAreaElement
-    ) {
-      if (current.closest(".meta, .criteria, .modal, .toolbar")) return;
-    }
+    if (!el || document.activeElement === el) return;
     el.focus();
-    if (el instanceof HTMLInputElement) el.select();
-  }, [active, rowIndex, colIndex]);
+  }, [active]);
 
   const flush = () => {
     const el = inputRef.current;
@@ -173,11 +164,16 @@ function SheetCell({
     if (value !== committedRef.current) onCommit(value);
   };
 
+  const remember = (value: string) => {
+    textRef.current = value;
+    setText(value);
+  };
+
   const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (isUndoKey(event)) {
       event.preventDefault();
       if (textRef.current !== committedRef.current) {
-        setText(committedRef.current);
+        remember(committedRef.current);
         return;
       }
       onUndo();
@@ -192,13 +188,13 @@ function SheetCell({
       const letter = event.key.toLowerCase();
       if (letter === "o") {
         event.preventDefault();
-        setText("Ok");
+        remember("Ok");
         onCommit("Ok");
         return;
       }
       if (letter === "n") {
         event.preventDefault();
-        setText("Nok");
+        remember("Nok");
         onCommit("Nok");
         return;
       }
@@ -234,7 +230,7 @@ function SheetCell({
           }}
           onChange={(event) => {
             const value = event.target.value as Polaridade;
-            setText(value);
+            remember(value);
             onCommit(value);
           }}
           onKeyDown={onKeyDown}
@@ -260,21 +256,13 @@ function SheetCell({
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        defaultValue={committed}
+        value={text}
         onFocus={() => {
           focusedRef.current = true;
           onActivate();
         }}
-        onInput={(event) => {
-          const value = (event.target as HTMLInputElement).value;
-          textRef.current = value;
-          setText(value);
-        }}
-        onChange={(event) => {
-          const value = event.target.value;
-          textRef.current = value;
-          setText(value);
-        }}
+        onChange={(event) => remember(event.target.value)}
+        onInput={(event) => remember((event.target as HTMLInputElement).value)}
         onBlur={() => {
           focusedRef.current = false;
           flush();
@@ -284,3 +272,5 @@ function SheetCell({
     </td>
   );
 }
+
+export default memo(SheetGrid);

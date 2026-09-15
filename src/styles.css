@@ -396,6 +396,8 @@ button, input, select {
   padding: 7px 4px;
   color: inherit;
   pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
   min-width: 3.2rem;
 }
 

@@ -235,8 +235,11 @@ describe("App grid", () => {
   it("fails the row if only one floating pole stays below the module voltage", () => {
     const [voc, erro, modulo] = Array.from(host.querySelectorAll(".criteria input")) as HTMLInputElement[];
     typeInto(voc, "1000");
+    act(() => { voc.blur(); });
     typeInto(erro, "5");
+    act(() => { erro.blur(); });
     typeInto(modulo, "46,7");
+    act(() => { modulo.blur(); });
     const addString = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Adicionar string",
     );

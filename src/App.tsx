@@ -281,11 +281,11 @@ export default function App() {
     });
   };
 
-  const patchHeader = (patch: Partial<Workbook>) => {
+  const patchHeader = useCallback((patch: Partial<Workbook>) => {
     mark((current) => ({ ...current, ...patch }));
-  };
+  }, [mark]);
 
-  const mutateActive = (fn: (inverter: Inverter) => Inverter, message?: string) => {
+  const mutateActive = useCallback((fn: (inverter: Inverter) => Inverter, message?: string) => {
     mark((current) => {
       rememberBook(current);
       const inverter =
@@ -298,9 +298,9 @@ export default function App() {
         ),
       };
     }, message);
-  };
+  }, [mark]);
 
-  const replaceActiveRows = (
+  const replaceActiveRows = useCallback((
     mutate: (rows: TestRow[]) => TestRow[],
     recordHistory = true,
   ) => {
@@ -319,7 +319,11 @@ export default function App() {
       };
     });
     setDirty(true);
-  };
+  }, []);
+
+  const removeActiveRow = useCallback((rowId: string) => {
+    mutateActive((inverter) => removeRow(inverter, rowId));
+  }, [mutateActive]);
 
   const submitMesa = () => {
     mutateActive(
@@ -383,7 +387,14 @@ export default function App() {
   const vis = visibleColumns(columns);
   const verdicts = useMemo(
     () => active.rows.map((row) => evaluateRow(row, book, columns)),
-    [active.rows, book, columns],
+    [
+      active.rows,
+      book.vocEsperada,
+      book.erroPercentual,
+      book.tensaoModulo,
+      book.criterioIsolacao,
+      columns,
+    ],
   );
   const stats = useMemo(() => {
     const rows = book.inverters.flatMap((inv) => inv.rows);
@@ -643,7 +654,7 @@ export default function App() {
                 columns={vis.map((column) => column.id)}
                 verdicts={verdicts}
                 onRowsChange={replaceActiveRows}
-                onRemove={(rowId) => mutateActive((inverter) => removeRow(inverter, rowId))}
+                onRemove={removeActiveRow}
                 onUndo={undo}
                 onRedo={redo}
               />

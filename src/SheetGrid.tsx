@@ -130,6 +130,7 @@ function SheetCell({
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
   useEffect(() => {
+    if (document.activeElement === inputRef.current) return;
     setText(committed);
   }, [committed]);
 
@@ -142,7 +143,11 @@ function SheetCell({
   }, [active, rowIndex, colIndex]);
 
   const flush = () => {
-    if (textRef.current !== committedRef.current) onCommit(textRef.current);
+    const el = inputRef.current;
+    const value = el && "value" in el ? el.value : textRef.current;
+    textRef.current = value;
+    setText(value);
+    if (value !== committedRef.current) onCommit(value);
   };
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -229,7 +234,11 @@ function SheetCell({
         value={text}
         onFocus={onActivate}
         onChange={(event) => setText(event.target.value)}
-        onInput={(event) => setText((event.target as HTMLInputElement).value)}
+        onInput={(event) => {
+          const value = (event.target as HTMLInputElement).value;
+          textRef.current = value;
+          setText(value);
+        }}
         onBlur={flush}
         onKeyDown={onKeyDown}
       />

@@ -17,3 +17,7 @@
     StrCpy $INSTDIR $0
   ${EndIf}
 !macroend
+
+!macro customInstall
+  CreateDirectory "$DOCUMENTS\Planilha de Testes UFV"
+!macroend

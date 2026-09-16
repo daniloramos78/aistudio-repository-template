@@ -2,17 +2,17 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   GROUP_LABEL,
-  groupSpan,
+  displayColumns,
+  displayGroupSpan,
   needsMegohmmeter,
   needsMultimeter,
   normalizeColumns,
   rowValue,
-  visibleColumns,
   type ColumnConfig,
   type ColumnGroup,
 } from "./columns";
 import type { Workbook } from "./types";
-import { evaluateRow, verdictLabel } from "./verdict";
+import { evaluateRow, isolacaoCorrigidaTexto, verdictLabel } from "./verdict";
 import { instrumentHasData, instrumentLine, isFirstOfMesa, mesaColorBand } from "./workbook";
 import dejaVuBold from "./fonts/DejaVuSansOhm-Bold.ttf?inline";
 import dejaVuRegular from "./fonts/DejaVuSansOhm.ttf?inline";
@@ -46,6 +46,9 @@ export function pdfHeaderNotes(workbook: Workbook): string[] {
     workbook.vocEsperada ? `Voc esp.: ${workbook.vocEsperada}` : "",
     workbook.erroPercentual ? `Erro ±: ${workbook.erroPercentual}%` : "",
     workbook.tensaoModulo ? `Módulo: ${workbook.tensaoModulo}` : "",
+    needsMegohmmeter(normalizeColumns(workbook.columns))
+      ? "Isolação corrigida a 20 °C (temperatura e umidade do cabeçalho)"
+      : "",
   ].filter(Boolean);
   const who = [
     workbook.tecnico ? `Técnico: ${workbook.tecnico}` : "",
@@ -96,7 +99,7 @@ export function buildPdf(workbook: Workbook): Uint8Array {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   registerOhmFont(doc);
   const columns = normalizeColumns(workbook.columns);
-  const vis = visibleColumns(columns);
+  const vis = displayColumns(columns);
   const colors = palette(workbook.printAppearance === "mono");
   const margin = 10;
 
@@ -145,6 +148,9 @@ export function buildPdf(workbook: Workbook): Uint8Array {
         const first = isFirstOfMesa(inverter.rows, rowIndex);
         const band = mesaColorBand(inverter.rows, rowIndex);
         const cells: Array<string | { content: string; styles: Record<string, unknown> }> = vis.map((column) => {
+          if (column.id === "isolamentoCorrigido") {
+            return isolacaoCorrigidaTexto(row, workbook);
+          }
           if (column.id === "mesa") {
             return {
               content: row.mesa,
@@ -198,7 +204,7 @@ export function buildPdf(workbook: Workbook): Uint8Array {
 function pdfHead(config: ColumnConfig, colors: ReturnType<typeof palette>) {
   const groups: ColumnGroup[] = ["id", "float", "iso"];
   const groupRow = groups.flatMap((group) => {
-    const span = groupSpan(config, group);
+    const span = displayGroupSpan(config, group);
     if (!span) return [];
     const styles =
       group === "id"
@@ -213,5 +219,5 @@ function pdfHead(config: ColumnConfig, colors: ReturnType<typeof palette>) {
     colSpan: 1,
     styles: { fillColor: colors.result, textColor: 255 },
   });
-  return [groupRow, [...visibleColumns(config).map((column) => column.label), "Aprov."]];
+  return [groupRow, [...displayColumns(config).map((column) => column.label), "Aprov."]];
 }

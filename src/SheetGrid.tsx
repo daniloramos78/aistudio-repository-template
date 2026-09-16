@@ -8,15 +8,16 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { isFirstOfMesa, mesaColorBand, propagateIsolation } from "./workbook";
-import { rowValue, type ColumnId } from "./columns";
+import { CONDUCTOR_SECTIONS, rowValue, type ColumnId, type DisplayColumnId } from "./columns";
 import { isRedoKey, isUndoKey, keyMove, moveCell, type CellPos } from "./sheetKeys";
 import type { Polaridade, TestRow } from "./types";
 import { verdictLabel, type Verdict } from "./verdict";
 
 interface SheetGridProps {
   rows: TestRow[];
-  columns: ColumnId[];
+  columns: DisplayColumnId[];
   verdicts: Verdict[];
+  correctedValues: string[];
   onRowsChange: (mutate: (rows: TestRow[]) => TestRow[], recordHistory?: boolean) => void;
   onRemove: (rowId: string) => void;
   onUndo: () => void;
@@ -27,6 +28,7 @@ function SheetGrid({
   rows,
   columns,
   verdicts,
+  correctedValues,
   onRowsChange,
   onRemove,
   onUndo,
@@ -85,9 +87,13 @@ function SheetGrid({
               colIndex={colIndex}
               first={isFirstOfMesa(rows, rowIndex)}
               band={mesaColorBand(rows, rowIndex)}
+              computedValue={columnId === "isolamentoCorrigido" ? (correctedValues[rowIndex] ?? "") : undefined}
               active={active.row === rowIndex && active.col === colIndex}
               onActivate={() => activate(rowIndex, colIndex)}
-              onCommit={(value) => commit(row.id, columnId, value)}
+              onCommit={(value) => {
+                if (columnId === "isolamentoCorrigido") return;
+                commit(row.id, columnId, value);
+              }}
               onNavigate={go}
               onUndo={onUndo}
               onRedo={onRedo}
@@ -114,6 +120,7 @@ function SheetCell({
   columnId,
   first,
   band,
+  computedValue,
   active,
   onActivate,
   onCommit,
@@ -123,10 +130,11 @@ function SheetCell({
 }: {
   row: TestRow;
   rowIndex: number;
-  columnId: ColumnId;
+  columnId: DisplayColumnId;
   colIndex: number;
   first: boolean;
   band: "a" | "b";
+  computedValue?: string;
   active: boolean;
   onActivate: () => void;
   onCommit: (value: string) => void;
@@ -134,7 +142,9 @@ function SheetCell({
   onUndo: () => void;
   onRedo: () => void;
 }) {
-  const committed = rowValue(row, columnId);
+  const committed = columnId === "isolamentoCorrigido"
+    ? (computedValue ?? "")
+    : rowValue(row, columnId);
   const [text, setText] = useState(committed);
   const committedRef = useRef(committed);
   committedRef.current = committed;
@@ -213,6 +223,67 @@ function SheetCell({
     active ? "active-cell" : "",
     columnId === "mesa" ? `mesa band-${band}${first ? "" : " muted"}` : "",
   ].filter(Boolean).join(" ") || undefined;
+
+  if (columnId === "isolamentoCorrigido") {
+    return (
+      <td className={[className, "computed"].filter(Boolean).join(" ")}>
+        <input
+          ref={(el) => {
+            inputRef.current = el;
+          }}
+          type="text"
+          readOnly
+          data-sheet-cell="1"
+          aria-label={columnId}
+          value={committed}
+          onFocus={() => {
+            focusedRef.current = true;
+            onActivate();
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+          }}
+          onKeyDown={onKeyDown}
+        />
+      </td>
+    );
+  }
+
+  if (columnId === "secaoCondutor") {
+    const options = text && !(CONDUCTOR_SECTIONS as readonly string[]).includes(text)
+      ? [text, ...CONDUCTOR_SECTIONS]
+      : [...CONDUCTOR_SECTIONS];
+    return (
+      <td className={className}>
+        <select
+          ref={(el) => {
+            inputRef.current = el;
+          }}
+          data-sheet-cell="1"
+          aria-label={columnId}
+          value={text}
+          onFocus={() => {
+            focusedRef.current = true;
+            onActivate();
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+          }}
+          onChange={(event) => {
+            const value = event.target.value;
+            remember(value);
+            onCommit(value);
+          }}
+          onKeyDown={onKeyDown}
+        >
+          <option value="" />
+          {options.map((size) => (
+            <option key={size} value={size}>{`${size} mm²`}</option>
+          ))}
+        </select>
+      </td>
+    );
+  }
 
   if (columnId === "polaridade") {
     return (

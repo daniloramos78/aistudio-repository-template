@@ -14,6 +14,7 @@ export type ColumnId =
   | "stringNo"
   | "pv"
   | "mppt"
+  | "secaoCondutor"
   | "tensaoVoc"
   | "polaridade"
   | "flutPositivo"
@@ -32,6 +33,7 @@ export interface TestRow {
   stringNo: string;
   pv: string;
   mppt: string;
+  secaoCondutor: string;
   tensaoVoc: string;
   polaridade: Polaridade;
   flutPositivo: string;
@@ -84,3 +86,5 @@ export const FILE_VERSION = 1 as const;
 export const DRAFT_KEY = "planilha-testes-ufv.draft";
 export const RECENT_KEY = "planilha-testes-ufv.recent";
 export const LAYOUTS_KEY = "planilha-testes-ufv.layouts";
+export const DATA_FOLDER_NAME = "Planilha de Testes UFV";
+export const AUTOSAVE_FILE = "rascunho-automatico.ufv.json";

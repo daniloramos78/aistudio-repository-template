@@ -124,30 +124,22 @@ describe("App grid", () => {
     expect(mesas()[0].value).toBe("");
   });
 
-  it("opens the mesa dialog instead of window.prompt", () => {
-    const prompt = vi.fn();
-    vi.stubGlobal("prompt", prompt);
-    const addMesa = Array.from(host.querySelectorAll("button")).find(
-      (button) => button.textContent === "Adicionar mesa",
+  it("has no Adicionar mesa button and lets the user type mesa names on strings", () => {
+    expect(
+      Array.from(host.querySelectorAll("button")).some((button) => button.textContent === "Adicionar mesa"),
+    ).toBe(false);
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
     );
-    expect(addMesa).toBeTruthy();
-    click(addMesa!);
-    expect(prompt).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Adicionar mesa");
-    expect(host.textContent).toContain("Quantidade de strings");
-
-    const dialog = host.querySelector('[aria-labelledby="mesa-title"]');
-    const name = dialog?.querySelector("input") as HTMLInputElement;
-    typeInto(name, "Mesa 07");
-    const confirm = Array.from(dialog!.querySelectorAll("button")).find(
-      (button) => button.textContent === "Adicionar",
-    );
-    click(confirm!);
-
+    click(addString!);
     const mesa = host.querySelector('[aria-label="mesa"]') as HTMLInputElement;
+    expect(mesa).toBeTruthy();
+    typeInto(mesa, "Mesa 07");
+    act(() => { mesa.blur(); });
     expect(mesa.value).toBe("Mesa 07");
-    const stringNo = host.querySelector('[aria-label="stringNo"]') as HTMLInputElement;
-    expect(stringNo.value).toBe("");
+    expect((host.querySelector('[aria-label="stringNo"]') as HTMLInputElement).value).toBe("");
+    expect(host.querySelector('[aria-label="secaoCondutor"]')).toBeTruthy();
+    expect(host.textContent).toContain("Corr. 20°C");
   });
 
   it("starts a new sheet with empty criteria, isolation options and no TΩ column", () => {
@@ -167,6 +159,8 @@ describe("App grid", () => {
     expect(headers).not.toContain("TΩ");
     expect(headers).toContain("Tensão Aplicada");
     expect(headers).toContain("Tempo");
+    expect(headers).toContain("Seção mm²");
+    expect(headers).toContain("Corr. 20°C");
     expect(headers).toContain("Aprov.");
     const groups = Array.from(host.querySelectorAll(".sheet thead .group")).map((th) => th.textContent);
     expect(groups).toContain("Teste de Isolação");
@@ -196,6 +190,7 @@ describe("App grid", () => {
     expect(headers).not.toContain("Tensão Aplicada");
     expect(headers).not.toContain("Tempo");
     expect(headers).not.toContain("MΩ");
+    expect(headers).not.toContain("Corr. 20°C");
     expect(headers).toContain("Positivo + T");
     const open = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Instrumentos" || button.textContent === "Instrumentos ✓",
@@ -207,14 +202,11 @@ describe("App grid", () => {
   });
 
   it("copies tensão aplicada and tempo onto the next string", () => {
-    const addMesaBtn = Array.from(host.querySelectorAll("button")).find(
-      (button) => button.textContent === "Adicionar mesa",
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
     );
-    click(addMesaBtn!);
-    const confirm = Array.from(host.querySelectorAll(".modal button")).find(
-      (button) => button.textContent === "Adicionar",
-    );
-    click(confirm!);
+    click(addString!);
+    click(addString!);
     fillCell(host, "tensaoAplicada", "1kV");
     fillCell(host, "isolamentoTempo", "60s");
     const tensoesBefore = Array.from(
@@ -226,9 +218,6 @@ describe("App grid", () => {
     expect(tensoesBefore).toHaveLength(2);
     expect(tensoesBefore[1].value).toBe("1kV");
     expect(temposBefore[1].value).toBe("60s");
-    const addString = Array.from(host.querySelectorAll("button")).find(
-      (button) => button.textContent === "Adicionar string",
-    );
     click(addString!);
     const tensoes = Array.from(host.querySelectorAll('[aria-label="tensaoAplicada"]')) as HTMLInputElement[];
     const tempos = Array.from(host.querySelectorAll('[aria-label="isolamentoTempo"]')) as HTMLInputElement[];
@@ -307,7 +296,7 @@ describe("App grid", () => {
     const actions = Array.from(host.querySelectorAll(".sheet-toolbar .actions button")).map(
       (button) => button.textContent,
     );
-    expect(actions).toEqual(["Adicionar mesa", "Adicionar inversor", "Adicionar string"]);
+    expect(actions).toEqual(["Adicionar inversor", "Adicionar string"]);
     const before = host.querySelectorAll(".tabs .tab").length;
     const addInv = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Adicionar inversor",
@@ -343,18 +332,17 @@ describe("App grid", () => {
   });
 
   it("paints alternating mesa cells on the grid", () => {
-    const addMesa = Array.from(host.querySelectorAll("button")).find(
-      (button) => button.textContent === "Adicionar mesa",
-    );
-    click(addMesa!);
-    const dialog = host.querySelector('[aria-labelledby="mesa-title"]');
-    typeInto(dialog!.querySelector("input") as HTMLInputElement, "Mesa 01");
-    click(Array.from(dialog!.querySelectorAll("button")).find((button) => button.textContent === "Adicionar")!);
     const addString = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Adicionar string",
     );
     click(addString!);
+    click(addString!);
+    click(addString!);
     const mesas = () => Array.from(host.querySelectorAll('[aria-label="mesa"]')) as HTMLInputElement[];
+    typeInto(mesas()[0], "Mesa 01");
+    act(() => { mesas()[0].blur(); });
+    typeInto(mesas()[1], "Mesa 01");
+    act(() => { mesas()[1].blur(); });
     typeInto(mesas()[2], "Mesa 02");
     act(() => { mesas()[2].blur(); });
     expect(mesas()[0].closest("td")?.className).toContain("band-a");
@@ -404,5 +392,32 @@ describe("App grid", () => {
     click(printMono);
     click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Aplicar")!);
     expect(host.querySelector(".app")?.classList.contains("mono")).toBe(true);
+  });
+
+  it("shows a humidity alert and corrected isolation only when isolation is on", () => {
+    const umidade = host.querySelector(".meta input[placeholder='40.00']") as HTMLInputElement;
+    typeInto(umidade, "85");
+    act(() => { umidade.blur(); });
+    expect(host.textContent).toMatch(/Umidade acima de 80%/);
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    fillCell(host, "isolamentoGohm", "5.5");
+    const corrected = host.querySelector('[aria-label="isolamentoCorrigido"]') as HTMLInputElement;
+    expect(corrected.value).toBe("—");
+    const temp = host.querySelector(".meta input[placeholder='33']") as HTMLInputElement;
+    typeInto(temp, "29");
+    act(() => { temp.blur(); });
+    expect((host.querySelector('[aria-label="isolamentoCorrigido"]') as HTMLInputElement).value).toMatch(/GΩ/);
+
+    const config = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Configuração",
+    );
+    click(config!);
+    click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Usina pequena")!);
+    click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Aplicar")!);
+    expect(host.querySelector('[aria-label="isolamentoCorrigido"]')).toBeNull();
+    expect(host.textContent).not.toMatch(/Umidade acima de 80%/);
   });
 });

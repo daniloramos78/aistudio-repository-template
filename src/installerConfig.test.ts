@@ -13,6 +13,7 @@ describe("windows installer upgrade", () => {
     expect(pkg.build.nsis.deleteAppDataOnUninstall).toBe(false);
     expect(pkg.build.nsis.include).toBe("build/installer.nsh");
     expect(pkg.build.nsis.uninstallDisplayName).toBe("Planilha de Testes UFV");
+    expect(script).toMatch(/CreateDirectory "\$DOCUMENTS\\Planilha de Testes UFV"/);
   });
 
   it("reuses the already installed folder when the previous exe is present", () => {

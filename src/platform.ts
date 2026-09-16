@@ -6,16 +6,22 @@ export interface DesktopApi {
   saveFile: (
     filePath: string | null,
     contents: string,
+    defaultName?: string,
   ) => Promise<{ filePath: string } | null>;
   savePdf: (
     data: string,
     defaultName: string,
   ) => Promise<{ filePath: string } | null>;
+  getDataFolder: () => Promise<string>;
+  autosave: (contents: string) => Promise<{ filePath: string } | null>;
+  loadAutosave: () => Promise<{ filePath: string; contents: string } | null>;
+  clearAutosave: () => Promise<void>;
 }
 
 declare global {
   interface Window {
     desktop?: DesktopApi;
+    flushAutosave?: () => Promise<unknown> | unknown;
   }
 }
 
@@ -38,7 +44,11 @@ export async function saveWorkbookFile(
   saveAs: boolean,
 ): Promise<string | null> {
   if (window.desktop) {
-    const result = await window.desktop.saveFile(saveAs ? null : currentPath, contents);
+    const result = await window.desktop.saveFile(
+      saveAs ? null : currentPath,
+      contents,
+      suggestedFileName(workbook),
+    );
     return result?.filePath ?? null;
   }
   downloadText(suggestedFileName(workbook), contents);

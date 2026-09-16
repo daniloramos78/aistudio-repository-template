@@ -134,6 +134,27 @@ button, input, select {
 
 .meta .wide { grid-column: span 2; }
 
+.status-umidade-alerta {
+  grid-column: 1 / -1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.status-umidade-alerta.alerta {
+  background: #ffe8b8;
+  color: #8a5a12;
+}
+
+.status-umidade-alerta.critico,
+.status-umidade-alerta.invalido {
+  background: #f8d0d0;
+  color: #8f1d1d;
+}
+
 .meta input {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -468,6 +489,12 @@ button, input, select {
 .verdict.pass .verdict-dot { background: #2e7d32; color: #fff; }
 .verdict.fail .verdict-dot { background: #c62828; color: #fff; }
 .verdict.pending .verdict-dot { background: #9a927f; color: #fff; }
+
+.sheet td.computed input {
+  font-weight: 700;
+  color: var(--forest);
+  background: #eef6ef;
+}
 .sheet td.mesa.band-a,
 .sheet td.mesa.band-a input,
 .sheet td.mesa.band-a input:hover,

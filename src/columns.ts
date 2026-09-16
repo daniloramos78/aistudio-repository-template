@@ -16,6 +16,7 @@ export const COLUMNS: ColumnDef[] = [
   { id: "stringNo", label: "String", group: "id" },
   { id: "pv", label: "PV", group: "id" },
   { id: "mppt", label: "MPPT", group: "id" },
+  { id: "secaoCondutor", label: "Seção mm²", group: "id" },
   { id: "tensaoVoc", label: "Tensão Voc", group: "id" },
   { id: "polaridade", label: "Polaridade", group: "id" },
   { id: "flutPositivo", label: "Positivo + T", group: "float" },
@@ -38,6 +39,7 @@ export const DEFAULT_COLUMNS: ColumnConfig = {
   stringNo: true,
   pv: true,
   mppt: true,
+  secaoCondutor: true,
   tensaoVoc: true,
   polaridade: true,
   flutPositivo: true,
@@ -54,6 +56,7 @@ export const SMALL_PLANT_COLUMNS: ColumnConfig = {
   stringNo: true,
   pv: false,
   mppt: true,
+  secaoCondutor: false,
   tensaoVoc: true,
   polaridade: true,
   flutPositivo: true,
@@ -138,6 +141,48 @@ export function normalizeColumns(input?: Partial<ColumnConfig> | null): ColumnCo
     return { ...DEFAULT_COLUMNS };
   }
   return next;
+}
+
+export const CONDUCTOR_SECTIONS = [
+  "2,5",
+  "4",
+  "6",
+  "10",
+  "16",
+  "25",
+  "35",
+  "50",
+  "70",
+  "95",
+  "120",
+] as const;
+
+export type DisplayColumnId = ColumnId | "isolamentoCorrigido";
+
+export interface DisplayColumnDef {
+  id: DisplayColumnId;
+  label: string;
+  group: ColumnGroup;
+  computed?: boolean;
+}
+
+export function displayColumns(config: ColumnConfig): DisplayColumnDef[] {
+  const vis: DisplayColumnDef[] = visibleColumns(config);
+  if (!needsMegohmmeter(config)) return vis;
+  const extra: DisplayColumnDef = {
+    id: "isolamentoCorrigido",
+    label: "Corr. 20°C",
+    group: "iso",
+    computed: true,
+  };
+  const lastIso = [...vis].reverse().find((column) => column.group === "iso");
+  if (!lastIso) return [...vis, extra];
+  const index = vis.findIndex((column) => column.id === lastIso.id);
+  return [...vis.slice(0, index + 1), extra, ...vis.slice(index + 1)];
+}
+
+export function displayGroupSpan(config: ColumnConfig, group: ColumnGroup): number {
+  return displayColumns(config).filter((column) => column.group === group).length;
 }
 
 export function visibleColumns(config: ColumnConfig): ColumnDef[] {

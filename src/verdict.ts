@@ -1,3 +1,4 @@
+import { calcularIsolacaoCorrigida, formatarIsolacaoCorrigida } from "./megometro";
 import type { ColumnConfig, IsolationCriterion, TestRow, Workbook } from "./types";
 
 export type Verdict = "pass" | "fail" | "pending";
@@ -90,8 +91,23 @@ function isolationVerdict(row: TestRow, book: Workbook, columns: ColumnConfig): 
   if (!ohmVisible) return "pending";
   const mega = isolationMegaohms(row);
   if (mega == null) return "pending";
+  const temperature = parseNumber(book.temperatura);
+  const humidity = parseNumber(book.umidade);
+  const corrected = temperature != null && humidity != null
+    ? calcularIsolacaoCorrigida(mega, temperature, humidity)
+    : mega;
   const min = ISOLATION_MIN_MOHM[book.criterioIsolacao] ?? ISOLATION_MIN_MOHM.nbr5410;
-  return mega >= min ? "pass" : "fail";
+  if (humidity != null && humidity > 80) return "pending";
+  return corrected >= min ? "pass" : "fail";
+}
+
+export function isolacaoCorrigidaTexto(row: TestRow, book: Workbook): string {
+  const mega = isolationMegaohms(row);
+  if (mega == null) return "";
+  const temperature = parseNumber(book.temperatura);
+  const humidity = parseNumber(book.umidade);
+  if (temperature == null || humidity == null) return "—";
+  return formatarIsolacaoCorrigida(calcularIsolacaoCorrigida(mega, temperature, humidity));
 }
 
 export function evaluateRow(row: TestRow, book: Workbook, columns: ColumnConfig): Verdict {

@@ -13,18 +13,17 @@ import {
   DEFAULT_COLUMNS,
   GROUP_LABEL,
   applyIsolationCoupling,
-  groupSpan,
+  displayColumns,
+  displayGroupSpan,
   layoutFor,
   needsMegohmmeter,
   needsMultimeter,
   normalizeColumns,
   saveLayout,
-  visibleColumns,
   type ColumnConfig,
   type ColumnGroup,
 } from "./columns";
 import {
-  addMesa,
   addString,
   countMesas,
   createEmptyWorkbook,
@@ -40,7 +39,8 @@ import {
   serializeWorkbook,
   suggestedFileName,
 } from "./workbook";
-import { ISOLATION_OPTIONS, evaluateRow } from "./verdict";
+import { ISOLATION_OPTIONS, evaluateRow, isolacaoCorrigidaTexto, parseNumber } from "./verdict";
+import { validarUmidadeRelativa } from "./megometro";
 
 type Status = { kind: "ok" | "warn" | "err"; text: string };
 
@@ -64,13 +64,13 @@ export default function App() {
   const [draftAppearance, setDraftAppearance] = useState<ColorMode>("color");
   const [draftPrintAppearance, setDraftPrintAppearance] = useState<ColorMode>("color");
   const [layoutNote, setLayoutNote] = useState("");
-  const [mesaOpen, setMesaOpen] = useState(false);
-  const [mesaName, setMesaName] = useState("");
-  const [mesaCount, setMesaCount] = useState("2");
+  const [dataFolder, setDataFolder] = useState("");
   const [demo] = useState(() => isDemoPage());
   const snapshot = useRef(serializeWorkbook(emptyDraft));
   const past = useRef<string[]>([]);
   const future = useRef<string[]>([]);
+  const bookRef = useRef(book);
+  bookRef.current = book;
 
   const active = book.inverters.find((inv) => inv.id === book.activeInverterId)
     ?? book.inverters[0];
@@ -138,19 +138,52 @@ export default function App() {
       });
       return;
     }
-    const draft = window.localStorage.getItem(DRAFT_KEY);
-    if (!draft) return;
-    try {
-      const recovered = parseWorkbook(draft);
-      if (serializeWorkbook(recovered) === snapshot.current) return;
-      if (window.confirm("Há um teste não salvo neste computador. Recuperar?")) {
-        setBook(recovered);
-        setDirty(true);
-        setStatus({ kind: "warn", text: "Rascunho recuperado. Salve no disco para não perder." });
+
+    const recoverLocal = () => {
+      const draft = window.localStorage.getItem(DRAFT_KEY);
+      if (!draft) return;
+      try {
+        const recovered = parseWorkbook(draft);
+        if (serializeWorkbook(recovered) === snapshot.current) return;
+        if (window.confirm("Há um teste não salvo neste computador. Recuperar?")) {
+          setBook(recovered);
+          setDirty(true);
+          setStatus({ kind: "warn", text: "Rascunho recuperado. Salve no disco para não perder." });
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
+    };
+
+    void (async () => {
+      if (!window.desktop) {
+        recoverLocal();
+        return;
+      }
+      try {
+        const folder = await window.desktop.getDataFolder();
+        setDataFolder(folder);
+        const autosave = await window.desktop.loadAutosave();
+        if (autosave?.contents) {
+          const recovered = parseWorkbook(autosave.contents);
+          if (serializeWorkbook(recovered) !== snapshot.current) {
+            if (window.confirm("Há um rascunho automático na pasta Planilha de Testes UFV. Continuar de onde parou?")) {
+              setBook(recovered);
+              setFilePath(autosave.filePath);
+              setDirty(true);
+              setStatus({
+                kind: "warn",
+                text: `Rascunho recuperado em ${autosave.filePath}. Edite e salve quando terminar.`,
+              });
+              return;
+            }
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      recoverLocal();
+    })();
   }, []);
 
   useEffect(() => {
@@ -170,9 +203,27 @@ export default function App() {
     if (demo) return;
     const handle = window.setTimeout(() => {
       window.localStorage.setItem(DRAFT_KEY, serializeWorkbook(book));
+      void window.desktop?.autosave(serializeWorkbook(book));
     }, 400);
     return () => window.clearTimeout(handle);
   }, [book, demo]);
+
+  useEffect(() => {
+    window.flushAutosave = () => {
+      const contents = serializeWorkbook(bookRef.current);
+      window.localStorage.setItem(DRAFT_KEY, contents);
+      return window.desktop?.autosave(contents);
+    };
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void window.flushAutosave?.();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("beforeunload", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("beforeunload", onHide);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -232,6 +283,7 @@ export default function App() {
     setFilePath(null);
     setDirty(false);
     window.localStorage.removeItem(DRAFT_KEY);
+    void window.desktop?.clearAutosave();
     setStatus({ kind: "ok", text: "Novo teste em branco. Preencha os dados de campo e salve." });
   };
 
@@ -261,6 +313,7 @@ export default function App() {
       setDirty(false);
       remember(opened.filePath);
       window.localStorage.removeItem(DRAFT_KEY);
+      void window.desktop?.autosave(opened.contents);
       setStatus({ kind: "ok", text: `Aberto: ${opened.filePath ?? suggestedFileName(next)}` });
     } catch (error) {
       setStatus({ kind: "err", text: error instanceof Error ? error.message : "Não foi possível abrir o arquivo." });
@@ -277,6 +330,7 @@ export default function App() {
       setDirty(false);
       remember(saved);
       window.localStorage.removeItem(DRAFT_KEY);
+      void window.desktop?.autosave(contents);
       setStatus({ kind: "ok", text: `Salvo em ${saved}` });
     } catch (error) {
       setStatus({ kind: "err", text: error instanceof Error ? error.message : "Falha ao salvar." });
@@ -357,14 +411,6 @@ export default function App() {
     mutateActive((inverter) => removeRow(inverter, rowId));
   }, [mutateActive]);
 
-  const submitMesa = () => {
-    mutateActive(
-      (inverter) => addMesa(inverter, mesaName, Number(mesaCount) || 2),
-      "Mesa adicionada — linhas vazias para preencher",
-    );
-    setMesaOpen(false);
-  };
-
   const addInverter = () => {
     const nextInv = emptyInverter(book.inverters.length + 1);
     mark((current) => {
@@ -416,7 +462,10 @@ export default function App() {
   const editing = book.inverters.find((inv) => inv.id === editId) ?? null;
 
   const columns = book.columns ?? DEFAULT_COLUMNS;
-  const vis = visibleColumns(columns);
+  const vis = displayColumns(columns);
+  const humidityCheck = needsMegohmmeter(columns)
+    ? validarUmidadeRelativa(parseNumber(book.umidade))
+    : null;
   const verdicts = useMemo(
     () => active.rows.map((row) => evaluateRow(row, book, columns)),
     [
@@ -425,8 +474,16 @@ export default function App() {
       book.erroPercentual,
       book.tensaoModulo,
       book.criterioIsolacao,
+      book.temperatura,
+      book.umidade,
       columns,
     ],
+  );
+  const correctedValues = useMemo(
+    () => (needsMegohmmeter(columns)
+      ? active.rows.map((row) => isolacaoCorrigidaTexto(row, book))
+      : []),
+    [active.rows, book, columns],
   );
   const stats = useMemo(() => {
     const rows = book.inverters.flatMap((inv) => inv.rows);
@@ -500,6 +557,11 @@ export default function App() {
       </header>
 
       <section className="meta">
+        {needsMegohmmeter(columns) && humidityCheck && humidityCheck.nivel !== "ok" && humidityCheck.mensagem && parseNumber(book.umidade) != null && (
+          <div className={`status-umidade-alerta ${humidityCheck.nivel} no-print`}>
+            {humidityCheck.mensagem}
+          </div>
+        )}
         <label>
           Data
           <input
@@ -639,18 +701,6 @@ export default function App() {
           )}
         </div>
         <div className="actions">
-          {columns.mesa && (
-            <button
-              type="button"
-              onClick={() => {
-                setMesaName("");
-                setMesaCount("2");
-                setMesaOpen(true);
-              }}
-            >
-              Adicionar mesa
-            </button>
-          )}
           <button type="button" onClick={addInverter}>
             Adicionar inversor
           </button>
@@ -673,7 +723,7 @@ export default function App() {
           <thead>
             <tr>
               {(["id", "float", "iso"] as ColumnGroup[]).map((group) => {
-                const span = groupSpan(columns, group);
+                const span = displayGroupSpan(columns, group);
                 if (!span) return null;
                 return (
                   <th key={group} colSpan={span} className={`group ${group === "id" ? "blank" : group === "float" ? "float" : "iso"}`}>
@@ -697,7 +747,7 @@ export default function App() {
               <tr>
                 <td colSpan={vis.length + 2} className="empty">
                   Nenhuma linha neste inversor. Clique em{" "}
-                  <strong>{columns.mesa ? "Adicionar mesa" : "Adicionar string"}</strong>{" "}
+                  <strong>Adicionar string</strong>{" "}
                   para começar. As células entram vazias para você preencher no campo.
                 </td>
               </tr>
@@ -707,6 +757,7 @@ export default function App() {
                 rows={active.rows}
                 columns={vis.map((column) => column.id)}
                 verdicts={verdicts}
+                correctedValues={correctedValues}
                 onRowsChange={replaceActiveRows}
                 onRemove={removeActiveRow}
                 onUndo={undo}
@@ -720,7 +771,7 @@ export default function App() {
         <span className={status.kind}>{status.text}</span>
         <span>
           {dirty ? "Não salvo" : "Salvo"}
-          {filePath ? ` · ${filePath}` : ` · ${suggestedFileName(book)}`}
+          {filePath ? ` · ${filePath}` : dataFolder ? ` · ${dataFolder}` : ` · ${suggestedFileName(book)}`}
         </span>
         <span>
           Total: {stats.mesas} mesas · {stats.strings} strings · Aprovadas {stats.pass}
@@ -961,61 +1012,6 @@ export default function App() {
                 Aplicar
               </button>
               <button type="button" onClick={() => setConfigOpen(false)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {mesaOpen && (
-        <div className="modal-backdrop no-print" onClick={() => setMesaOpen(false)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-labelledby="mesa-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="mesa-title">Adicionar mesa</h2>
-            <p className="modal-hint">As linhas entram vazias. Preencha os valores no campo.</p>
-            <label>
-              Nome da mesa (opcional)
-              <input
-                autoFocus
-                value={mesaName}
-                placeholder="Ex.: Mesa 01"
-                onChange={(e) => setMesaName(e.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    submitMesa();
-                  }
-                }}
-              />
-            </label>
-            <label>
-              Quantidade de strings
-              <input
-                inputMode="numeric"
-                value={mesaCount}
-                onChange={(e) => setMesaCount(e.target.value.replaceAll(/\D+/g, ""))}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    submitMesa();
-                  }
-                }}
-              />
-            </label>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="primary"
-                onClick={submitMesa}
-              >
-                Adicionar
-              </button>
-              <button type="button" onClick={() => setMesaOpen(false)}>
                 Cancelar
               </button>
             </div>

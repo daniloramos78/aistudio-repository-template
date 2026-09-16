@@ -75,6 +75,18 @@ describe("verdict", () => {
     expect(evaluateRow(weak, { ...book, criterioIsolacao: "nbr16690_large" }, columns)).toBe("pass");
   });
 
+  it("uses temperature and humidity correction for isolation when both are filled", () => {
+    const weak = emptyRow({
+      tensaoVoc: "1000",
+      polaridade: "Ok",
+      flutPositivo: "45",
+      flutNegativo: "45",
+      isolamentoMohm: "0.9",
+    });
+    expect(evaluateRow(weak, book, columns)).toBe("fail");
+    expect(evaluateRow(weak, { ...book, temperatura: "29", umidade: "59" }, columns)).toBe("pass");
+  });
+
   it("stays pending until the header values are filled", () => {
     const row = emptyRow({ tensaoVoc: "1000", polaridade: "Ok" });
     expect(evaluateRow(row, createEmptyWorkbook(), columns)).toBe("pending");

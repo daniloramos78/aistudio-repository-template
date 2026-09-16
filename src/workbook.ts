@@ -25,6 +25,7 @@ export function emptyRow(overrides: Partial<TestRow> = {}): TestRow {
     stringNo: "",
     pv: "",
     mppt: "",
+    secaoCondutor: "",
     tensaoVoc: "",
     polaridade: "",
     flutPositivo: "",
@@ -159,9 +160,10 @@ export function propagateIsolation(
 export function addMesa(inverter: Inverter, mesaLabel: string, strings = 2): Inverter {
   const count = Math.max(1, Math.min(50, Math.trunc(Number(strings)) || 2));
   const copied = lastIsolationValues(inverter.rows);
+  const secao = inverter.rows[inverter.rows.length - 1]?.secaoCondutor ?? "";
   const rows = [...inverter.rows];
   for (let i = 0; i < count; i += 1) {
-    rows.push(emptyRow({ mesa: mesaLabel.trim(), ...copied }));
+    rows.push(emptyRow({ mesa: mesaLabel.trim(), secaoCondutor: secao, ...copied }));
   }
   return { ...inverter, rows };
 }
@@ -174,6 +176,7 @@ export function addString(inverter: Inverter, copyMesa = true): Inverter {
       ...inverter.rows,
       emptyRow({
         mesa: copyMesa ? last?.mesa ?? "" : "",
+        secaoCondutor: last?.secaoCondutor ?? "",
         ...lastIsolationValues(inverter.rows),
       }),
     ],
@@ -288,6 +291,7 @@ export function inverterHasData(inverter: Inverter): boolean {
       row.stringNo.trim() ||
       row.pv.trim() ||
       row.mppt.trim() ||
+      row.secaoCondutor.trim() ||
       row.tensaoVoc.trim() ||
       row.polaridade ||
       row.flutPositivo.trim() ||
@@ -379,6 +383,7 @@ function normalizeRow(input: Partial<TestRow>): TestRow {
     stringNo: String(input.stringNo ?? ""),
     pv: String(input.pv ?? ""),
     mppt: String(input.mppt ?? ""),
+    secaoCondutor: String(input.secaoCondutor ?? ""),
     tensaoVoc: String(input.tensaoVoc ?? ""),
     polaridade: polaridade as Polaridade,
     flutPositivo: String(input.flutPositivo ?? ""),
@@ -403,12 +408,14 @@ function row(
   aplicada = "1kV",
   tempo = "60s",
   gohm = "5.5",
+  secao = "6",
 ): TestRow {
   return emptyRow({
     mesa,
     stringNo,
     pv,
     mppt,
+    secaoCondutor: secao,
     tensaoVoc: voc,
     polaridade,
     flutPositivo: pos,

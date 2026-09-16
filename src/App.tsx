@@ -390,12 +390,14 @@ export default function App() {
     mutate: (rows: TestRow[]) => TestRow[],
     recordHistory = true,
   ) => {
+    let changed = false;
     setBook((current) => {
       const inverter =
         current.inverters.find((item) => item.id === current.activeInverterId)
         ?? current.inverters[0];
       const nextRows = mutate(inverter.rows);
       if (nextRows === inverter.rows) return current;
+      changed = true;
       if (recordHistory) rememberBook(current);
       return {
         ...current,
@@ -404,7 +406,7 @@ export default function App() {
         ),
       };
     });
-    setDirty(true);
+    if (changed) setDirty(true);
   }, []);
 
   const removeActiveRow = useCallback((rowId: string) => {
@@ -462,7 +464,8 @@ export default function App() {
   const editing = book.inverters.find((inv) => inv.id === editId) ?? null;
 
   const columns = book.columns ?? DEFAULT_COLUMNS;
-  const vis = displayColumns(columns);
+  const vis = useMemo(() => displayColumns(columns), [columns]);
+  const visIds = useMemo(() => vis.map((column) => column.id), [vis]);
   const humidityCheck = needsMegohmmeter(columns)
     ? validarUmidadeRelativa(parseNumber(book.umidade))
     : null;
@@ -755,7 +758,7 @@ export default function App() {
           ) : (
               <SheetGrid
                 rows={active.rows}
-                columns={vis.map((column) => column.id)}
+                columns={visIds}
                 verdicts={verdicts}
                 correctedValues={correctedValues}
                 onRowsChange={replaceActiveRows}

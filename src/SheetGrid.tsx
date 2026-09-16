@@ -52,8 +52,22 @@ function SheetGrid({
   }, [rows.length, columns.length]);
 
   const go = useCallback((dir: NonNullable<ReturnType<typeof keyMove>>) => {
-    setActive((pos) => moveCell(pos, dir, rows.length, columns.length));
-  }, [rows.length, columns.length]);
+    setActive((pos) => {
+      let next = moveCell(pos, dir, rows.length, columns.length);
+      const step = dir === "home" || dir === "first"
+        ? "right"
+        : dir === "end" || dir === "last"
+          ? "left"
+          : dir;
+      for (let i = 0; i < columns.length + 1; i += 1) {
+        if (columns[next.col] !== "isolamentoCorrigido") return next;
+        const after = moveCell(next, step, rows.length, columns.length);
+        if (after.row === next.row && after.col === next.col) return after;
+        next = after;
+      }
+      return next;
+    });
+  }, [rows.length, columns]);
 
   const activate = useCallback((row: number, col: number) => {
     setActive((pos) => (pos.row === row && pos.col === col ? pos : { row, col }));
@@ -166,7 +180,17 @@ function SheetCell({
     if (!becameActive) return;
     const el = inputRef.current;
     if (!el || document.activeElement === el) return;
+    const current = document.activeElement;
+    if (
+      current instanceof HTMLInputElement
+      || current instanceof HTMLSelectElement
+      || current instanceof HTMLTextAreaElement
+    ) {
+      if (current.closest(".meta, .criteria, .modal, .toolbar, .sheet-toolbar")) return;
+      if (!current.closest("[data-sheet-cell], .sheet")) return;
+    }
     el.focus();
+    if (el instanceof HTMLInputElement && !el.readOnly) el.select();
   }, [active]);
 
   const flush = () => {
@@ -222,6 +246,7 @@ function SheetCell({
   const className = [
     active ? "active-cell" : "",
     columnId === "mesa" ? `mesa band-${band}${first ? "" : " muted"}` : "",
+    columnId === "secaoCondutor" ? "secao" : "",
   ].filter(Boolean).join(" ") || undefined;
 
   if (columnId === "isolamentoCorrigido") {
@@ -262,6 +287,10 @@ function SheetCell({
           data-sheet-cell="1"
           aria-label={columnId}
           value={text}
+          onPointerDown={() => {
+            focusedRef.current = true;
+            onActivate();
+          }}
           onFocus={() => {
             focusedRef.current = true;
             onActivate();
@@ -295,6 +324,10 @@ function SheetCell({
           data-sheet-cell="1"
           aria-label={columnId}
           value={text}
+          onPointerDown={() => {
+            focusedRef.current = true;
+            onActivate();
+          }}
           onFocus={() => {
             focusedRef.current = true;
             onActivate();
@@ -318,7 +351,7 @@ function SheetCell({
   }
 
   return (
-    <td className={className} onMouseDown={onActivate}>
+    <td className={className}>
       <input
         ref={(el) => {
           inputRef.current = el;
@@ -331,6 +364,10 @@ function SheetCell({
         autoCapitalize="off"
         spellCheck={false}
         value={text}
+        onPointerDown={() => {
+          focusedRef.current = true;
+          onActivate();
+        }}
         onFocus={() => {
           focusedRef.current = true;
           onActivate();

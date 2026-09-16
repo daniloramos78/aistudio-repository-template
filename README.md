@@ -6,7 +6,7 @@ O modelo segue a planilha `Planilha de Testes.ods` (abas `INVERSOR_01` … `INVE
 
 ## No Windows
 
-Há um executável **portátil** (`Planilha de Testes UFV 1.3.6.exe`): copie para o PC (pasta, pen drive ou área de trabalho) e abra com dois cliques. Não precisa instalar nada.
+Há um executável **portátil** (`Planilha de Testes UFV 1.3.7.exe`): copie para o PC (pasta, pen drive ou área de trabalho) e abra com dois cliques. Não precisa instalar nada.
 
 Para gerar o **instalador** com atalho no menu Iniciar e na área de trabalho, no próprio Windows:
 
@@ -17,8 +17,8 @@ npm run dist:win
 
 Os arquivos saem na pasta `release/`:
 
-- `Planilha de Testes UFV Setup 1.3.6.exe` — instalador (atualiza a versão anterior sem desinstalar)
-- `Planilha de Testes UFV 1.3.6.exe` — portátil
+- `Planilha de Testes UFV Setup 1.3.7.exe` — instalador (atualiza a versão anterior sem desinstalar)
+- `Planilha de Testes UFV 1.3.7.exe` — portátil
 
 O instalador cria a pasta **Documentos\Planilha de Testes UFV**. O programa grava ali um `rascunho-automatico.ufv.json` enquanto você trabalha. Se fechar sem querer, abra o app e escolha recuperar, ou use **Abrir** nessa pasta.
 

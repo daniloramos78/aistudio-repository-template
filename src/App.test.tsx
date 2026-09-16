@@ -75,6 +75,56 @@ describe("App grid", () => {
     expect((host.querySelector('[aria-label="tensaoVoc"]') as HTMLInputElement).value).toBe("1002V");
   });
 
+  it("accepts typing in floating cells after choosing seção and polaridade", () => {
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+
+    const secao = host.querySelector('[aria-label="secaoCondutor"]') as HTMLSelectElement;
+    act(() => {
+      secao.focus();
+      secao.value = "2,5";
+      secao.dispatchEvent(new Event("change", { bubbles: true }));
+      secao.blur();
+    });
+    const pol = host.querySelector('[aria-label="polaridade"]') as HTMLSelectElement;
+    act(() => {
+      pol.focus();
+      pol.value = "Ok";
+      pol.dispatchEvent(new Event("change", { bubbles: true }));
+      pol.blur();
+    });
+
+    const pos = host.querySelector('[aria-label="flutPositivo"]') as HTMLInputElement;
+    act(() => { pos.focus(); });
+    typeInto(pos, "21");
+    expect(pos.value).toBe("21");
+    typeInto(pos, "21V");
+    act(() => { pos.blur(); });
+    expect((host.querySelector('[aria-label="flutPositivo"]') as HTMLInputElement).value).toBe("21V");
+    expect((host.querySelector('[aria-label="secaoCondutor"]') as HTMLSelectElement).value).toBe("2,5");
+    expect((host.querySelector('[aria-label="polaridade"]') as HTMLSelectElement).value).toBe("Ok");
+  });
+
+  it("skips the read-only Corr. 20°C cell when tabbing", () => {
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    click(addString!);
+    const gohm = host.querySelector('[aria-label="isolamentoGohm"]') as HTMLInputElement;
+    act(() => { gohm.focus(); });
+    act(() => {
+      gohm.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Tab",
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+    expect(document.activeElement).toBe(host.querySelectorAll('[aria-label="mesa"]')[1]);
+  });
+
   it("keeps typed header and cell text while the rest of the sheet re-renders", () => {
     const addString = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Adicionar string",

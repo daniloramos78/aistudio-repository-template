@@ -454,6 +454,10 @@ button, input, select {
   min-width: 3.2rem;
 }
 
+.sheet td.secao select {
+  min-width: 5.8rem;
+}
+
 .sheet td input:hover,
 .sheet td select:hover {
   background: #fff;

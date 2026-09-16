@@ -32,13 +32,20 @@ function createWindow() {
     minHeight: 700,
     backgroundColor: "#173628",
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
       spellcheck: false,
     },
+  });
+
+  win.setMenuBarVisibility(false);
+  win.webContents.setIgnoreMenuShortcuts(true);
+  win.on("focus", () => {
+    if (!win.isDestroyed()) win.webContents.focus();
   });
 
   if (!app.isPackaged) {
@@ -46,6 +53,15 @@ function createWindow() {
   } else {
     win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
   }
+
+  win.once("ready-to-show", () => {
+    win.show();
+    win.focus();
+  });
+  win.webContents.on("did-finish-load", () => {
+    win.focus();
+    win.webContents.focus();
+  });
 
   let closing = false;
   win.on("close", (event) => {

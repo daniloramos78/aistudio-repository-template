@@ -30,6 +30,14 @@ button, input, select {
   font: inherit;
 }
 
+input:not([type="checkbox"]):not([type="radio"]):not([type="date"]),
+textarea {
+  caret-color: var(--ink);
+  color: var(--ink);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .app {
   min-height: 100vh;
   display: grid;

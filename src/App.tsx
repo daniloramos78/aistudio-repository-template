@@ -228,6 +228,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
+      const typing = Boolean(target?.closest("input, textarea, select, [contenteditable]"));
+      if (typing && !event.ctrlKey && !event.metaKey) return;
       const inModal = Boolean(target?.closest(".modal"));
       const inHeader = Boolean(target?.closest(".meta, .criteria, .sheet-toolbar"));
       const inSheet = Boolean(target?.closest("[data-sheet-cell]"));
@@ -321,8 +323,9 @@ export default function App() {
   };
 
   const persist = async (saveAs = false) => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     try {
-      const contents = serializeWorkbook(book);
+      const contents = serializeWorkbook(bookRef.current);
       const saved = await saveWorkbookFile(book, contents, filePath, saveAs || !filePath);
       if (!saved) return;
       snapshot.current = contents;
@@ -338,8 +341,9 @@ export default function App() {
   };
 
   const exportPdf = async () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     try {
-      const bytes = buildPdf(book);
+      const bytes = buildPdf(bookRef.current);
       const saved = await savePdfFile(book, bytes);
       if (!saved) return;
       setStatus({ kind: "ok", text: `PDF gerado: ${saved}` });
@@ -819,26 +823,26 @@ export default function App() {
             </p>
             <label>
               Editar valores (nome)
-              <input
+              <FieldInput
                 autoFocus
                 value={editName}
-                onChange={(e) => {
-                  setEditName(e.target.value);
-                  const parsed = inverterNumberFromName(e.target.value);
+                onChange={(next) => {
+                  setEditName(next);
+                  const parsed = inverterNumberFromName(next);
                   if (parsed) setEditNumber(parsed);
                 }}
               />
             </label>
             <label>
               Alterar numeração
-              <input
+              <FieldInput
                 inputMode="numeric"
                 value={editNumber}
                 placeholder="01"
-                onChange={(e) => {
-                  const value = e.target.value.replaceAll(/\D+/g, "");
-                  setEditNumber(value);
-                  if (value) setEditName(inverterNameFromNumber(value));
+                sanitize={(next) => next.replaceAll(/\D+/g, "")}
+                onChange={(next) => {
+                  setEditNumber(next);
+                  if (next) setEditName(inverterNameFromNumber(next));
                 }}
               />
             </label>

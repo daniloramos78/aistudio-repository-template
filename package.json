@@ -1,6 +1,6 @@
 {
   "name": "planilha-testes-ufv",
-  "version": "1.3.7",
+  "version": "1.3.8",
   "description": "Aplicativo de campo para testes de strings e inversores em UFV, com salvamento local, PDF e impressão.",
   "author": "Danilo Ramos",
   "main": "electron/main.cjs",

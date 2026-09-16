@@ -1,55 +1,79 @@
 import {
-  useEffect,
+  useLayoutEffect,
   useRef,
-  useState,
   type FocusEventHandler,
   type InputHTMLAttributes,
   type KeyboardEventHandler,
 } from "react";
+import { flushSync } from "react-dom";
+import { installTypingGuard, isEditing } from "./ensureTyping";
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
   value: string;
   onChange: (value: string) => void;
+  sanitize?: (value: string) => string;
 };
 
+installTypingGuard();
+
 /**
- * Controlled from local state while focused. The workbook only updates on blur
- * (or Enter), so a parent re-render cannot wipe the keystroke — the 1.3.x
- * Electron bug.
+ * Uncontrolled while focused. Electron + React `value={...}` was swallowing
+ * every keystroke (header, sheet, instruments, inverter editor). The DOM keeps
+ * the text; we copy it into the workbook on input/blur/Enter.
  */
 export default function FieldInput({
   value,
   onChange,
+  sanitize,
   onFocus,
   onBlur,
   onKeyDown,
   ...props
 }: Props) {
-  const [text, setText] = useState(value);
-  const focused = useRef(false);
-  const committed = useRef(value);
-  committed.current = value;
+  const node = useRef<HTMLInputElement | null>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const sanitizeRef = useRef(sanitize);
+  sanitizeRef.current = sanitize;
 
-  useEffect(() => {
-    if (focused.current) return;
-    setText(value);
-  }, [value]);
-
-  const commit = (next: string) => {
-    setText(next);
-    if (next !== committed.current) onChangeRef.current(next);
+  const apply = (raw: string, sync: boolean) => {
+    const el = node.current;
+    const next = sanitizeRef.current ? sanitizeRef.current(raw) : raw;
+    if (el && el.value !== next) {
+      const caret = el.selectionStart ?? next.length;
+      el.value = next;
+      try {
+        el.setSelectionRange(Math.min(caret, next.length), Math.min(caret, next.length));
+      } catch {
+        /* ignore */
+      }
+    }
+    if (next === valueRef.current) return;
+    if (sync) {
+      try {
+        flushSync(() => onChangeRef.current(next));
+      } catch {
+        onChangeRef.current(next);
+      }
+    } else {
+      onChangeRef.current(next);
+    }
   };
 
+  useLayoutEffect(() => {
+    const el = node.current;
+    if (!el || isEditing(el)) return;
+    if (el.value !== value) el.value = value;
+  }, [value]);
+
   const handleFocus: FocusEventHandler<HTMLInputElement> = (event) => {
-    focused.current = true;
     onFocus?.(event);
   };
 
   const handleBlur: FocusEventHandler<HTMLInputElement> = (event) => {
-    focused.current = false;
-    commit(event.target.value);
+    apply(event.target.value, true);
     onBlur?.(event);
   };
 
@@ -63,14 +87,14 @@ export default function FieldInput({
   return (
     <input
       {...props}
-      value={text}
+      ref={node}
+      defaultValue={value}
       autoComplete="off"
       autoCorrect="off"
       autoCapitalize="off"
       spellCheck={false}
       onFocus={handleFocus}
-      onChange={(event) => setText(event.target.value)}
-      onInput={(event) => setText(event.currentTarget.value)}
+      onInput={(event) => apply(event.currentTarget.value, false)}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
     />

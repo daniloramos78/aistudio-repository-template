@@ -52,6 +52,7 @@ describe("App grid", () => {
       root.unmount();
     });
     host.remove();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     window.localStorage.removeItem(DRAFT_KEY);
     window.localStorage.removeItem(RECENT_KEY);
@@ -469,5 +470,43 @@ describe("App grid", () => {
     click(Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Aplicar")!);
     expect(host.querySelector('[aria-label="isolamentoCorrigido"]')).toBeNull();
     expect(host.textContent).not.toMatch(/Umidade acima de 80%/);
+  });
+
+  it("inserts header and sheet characters from keydown only (Electron)", () => {
+    vi.useFakeTimers();
+    const ufv = host.querySelector('input[placeholder="Ex.: Manga G. 05"]') as HTMLInputElement;
+    expect(ufv).toBeTruthy();
+    act(() => { ufv.focus(); });
+    act(() => {
+      ufv.dispatchEvent(new KeyboardEvent("keydown", { key: "M", bubbles: true, cancelable: true }));
+    });
+    act(() => { vi.runAllTimers(); });
+    expect(ufv.value).toBe("M");
+
+    const addString = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Adicionar string",
+    );
+    click(addString!);
+    const voc = host.querySelector('[aria-label="tensaoVoc"]') as HTMLInputElement;
+    act(() => { voc.focus(); });
+    act(() => {
+      voc.dispatchEvent(new KeyboardEvent("keydown", { key: "9", bubbles: true, cancelable: true }));
+    });
+    act(() => { vi.runAllTimers(); });
+    expect(voc.value).toBe("9");
+
+    const open = Array.from(host.querySelectorAll("button")).find(
+      (button) => button.textContent === "Instrumentos" || button.textContent === "Instrumentos ✓",
+    );
+    click(open!);
+    const dialog = host.querySelector('[aria-labelledby="instruments-title"]') as HTMLElement;
+    const instrument = dialog.querySelector("input") as HTMLInputElement;
+    act(() => { instrument.focus(); });
+    act(() => {
+      instrument.dispatchEvent(new KeyboardEvent("keydown", { key: "F", bubbles: true, cancelable: true }));
+    });
+    act(() => { vi.runAllTimers(); });
+    expect(instrument.value).toBe("F");
+    vi.useRealTimers();
   });
 });

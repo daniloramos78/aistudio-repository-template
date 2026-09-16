@@ -1,16 +1,17 @@
 import {
   memo,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { flushSync } from "react-dom";
 import { isFirstOfMesa, mesaColorBand, propagateIsolation } from "./workbook";
 import { CONDUCTOR_SECTIONS, rowValue, type ColumnId, type DisplayColumnId } from "./columns";
+import { isEditing } from "./ensureTyping";
 import { isRedoKey, isUndoKey, keyMove, moveCell, type CellPos } from "./sheetKeys";
-import type { Polaridade, TestRow } from "./types";
+import type { TestRow } from "./types";
 import { verdictLabel, type Verdict } from "./verdict";
 
 interface SheetGridProps {
@@ -22,6 +23,29 @@ interface SheetGridProps {
   onRemove: (rowId: string) => void;
   onUndo: () => void;
   onRedo: () => void;
+}
+
+function focusSheetPos(pos: CellPos, select = true) {
+  const el = document.querySelector(`[data-sheet-pos="${pos.row}:${pos.col}"]`);
+  if (!(el instanceof HTMLElement)) return;
+  el.focus();
+  if (select && el instanceof HTMLInputElement && !el.readOnly) el.select();
+}
+
+function nextCell(pos: CellPos, dir: NonNullable<ReturnType<typeof keyMove>>, rowCount: number, columns: DisplayColumnId[]): CellPos {
+  let next = moveCell(pos, dir, rowCount, columns.length);
+  const step = dir === "home" || dir === "first"
+    ? "right"
+    : dir === "end" || dir === "last"
+      ? "left"
+      : dir;
+  for (let i = 0; i < columns.length + 1; i += 1) {
+    if (columns[next.col] !== "isolamentoCorrigido") return next;
+    const after = moveCell(next, step, rowCount, columns.length);
+    if (after.row === next.row && after.col === next.col) return after;
+    next = after;
+  }
+  return next;
 }
 
 function SheetGrid({
@@ -36,10 +60,14 @@ function SheetGrid({
 }: SheetGridProps) {
   const [active, setActive] = useState<CellPos>({ row: 0, col: 0 });
   const prevLen = useRef(rows.length);
+  const pendingFocus = useRef<CellPos | null>(null);
 
   useLayoutEffect(() => {
     if (rows.length > prevLen.current) {
-      setActive({ row: prevLen.current, col: 0 });
+      const row = prevLen.current;
+      const pos = { row, col: 0 };
+      setActive(pos);
+      pendingFocus.current = pos;
     } else if (rows.length > 0) {
       setActive((pos) => {
         const row = Math.min(pos.row, rows.length - 1);
@@ -51,20 +79,17 @@ function SheetGrid({
     prevLen.current = rows.length;
   }, [rows.length, columns.length]);
 
+  useLayoutEffect(() => {
+    const pos = pendingFocus.current;
+    if (!pos) return;
+    pendingFocus.current = null;
+    focusSheetPos(pos);
+  });
+
   const go = useCallback((dir: NonNullable<ReturnType<typeof keyMove>>) => {
     setActive((pos) => {
-      let next = moveCell(pos, dir, rows.length, columns.length);
-      const step = dir === "home" || dir === "first"
-        ? "right"
-        : dir === "end" || dir === "last"
-          ? "left"
-          : dir;
-      for (let i = 0; i < columns.length + 1; i += 1) {
-        if (columns[next.col] !== "isolamentoCorrigido") return next;
-        const after = moveCell(next, step, rows.length, columns.length);
-        if (after.row === next.row && after.col === next.col) return after;
-        next = after;
-      }
+      const next = nextCell(pos, dir, rows.length, columns);
+      pendingFocus.current = next;
       return next;
     });
   }, [rows.length, columns]);
@@ -131,7 +156,9 @@ function SheetGrid({
 
 function SheetCell({
   row,
+  rowIndex,
   columnId,
+  colIndex,
   first,
   band,
   computedValue,
@@ -159,58 +186,39 @@ function SheetCell({
   const committed = columnId === "isolamentoCorrigido"
     ? (computedValue ?? "")
     : rowValue(row, columnId);
-  const [text, setText] = useState(committed);
   const committedRef = useRef(committed);
   committedRef.current = committed;
-  const textRef = useRef(text);
-  textRef.current = text;
-  const focusedRef = useRef(false);
-  const wasActive = useRef(false);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
-
-  useEffect(() => {
-    if (focusedRef.current) return;
-    if (document.activeElement === inputRef.current) return;
-    setText(committed);
-  }, [committed]);
+  const pos = `${rowIndex}:${colIndex}`;
 
   useLayoutEffect(() => {
-    const becameActive = active && !wasActive.current;
-    wasActive.current = active;
-    if (!becameActive) return;
     const el = inputRef.current;
-    if (!el || document.activeElement === el) return;
-    const current = document.activeElement;
-    if (
-      current instanceof HTMLInputElement
-      || current instanceof HTMLSelectElement
-      || current instanceof HTMLTextAreaElement
-    ) {
-      if (current.closest(".meta, .criteria, .modal, .toolbar, .sheet-toolbar")) return;
-      if (!current.closest("[data-sheet-cell], .sheet")) return;
+    if (!el || isEditing(el)) return;
+    if (el.value !== committed) el.value = committed;
+  }, [committed]);
+
+  const flush = (sync = false) => {
+    const el = inputRef.current;
+    const value = el && "value" in el ? el.value : committedRef.current;
+    if (value === committedRef.current) return;
+    if (sync) {
+      try {
+        flushSync(() => onCommit(value));
+      } catch {
+        onCommit(value);
+      }
+    } else {
+      onCommit(value);
     }
-    el.focus();
-    if (el instanceof HTMLInputElement && !el.readOnly) el.select();
-  }, [active]);
-
-  const flush = () => {
-    const el = inputRef.current;
-    const value = el && "value" in el ? el.value : textRef.current;
-    textRef.current = value;
-    setText(value);
-    if (value !== committedRef.current) onCommit(value);
-  };
-
-  const remember = (value: string) => {
-    textRef.current = value;
-    setText(value);
   };
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (isUndoKey(event)) {
       event.preventDefault();
-      if (textRef.current !== committedRef.current) {
-        remember(committedRef.current);
+      const el = inputRef.current;
+      const current = el && "value" in el ? el.value : committedRef.current;
+      if (current !== committedRef.current) {
+        if (el && "value" in el) el.value = committedRef.current;
         return;
       }
       onUndo();
@@ -225,13 +233,13 @@ function SheetCell({
       const letter = event.key.toLowerCase();
       if (letter === "o") {
         event.preventDefault();
-        remember("Ok");
+        if (inputRef.current) inputRef.current.value = "Ok";
         onCommit("Ok");
         return;
       }
       if (letter === "n") {
         event.preventDefault();
-        remember("Nok");
+        if (inputRef.current) inputRef.current.value = "Nok";
         onCommit("Nok");
         return;
       }
@@ -239,8 +247,15 @@ function SheetCell({
     const dir = keyMove(event);
     if (!dir) return;
     event.preventDefault();
-    flush();
+    flush(true);
     onNavigate(dir);
+  };
+
+  const bindField = {
+    onPointerDown: () => onActivate(),
+    onFocus: () => onActivate(),
+    onBlur: () => flush(true),
+    onKeyDown,
   };
 
   const className = [
@@ -259,15 +274,10 @@ function SheetCell({
           type="text"
           readOnly
           data-sheet-cell="1"
+          data-sheet-pos={pos}
           aria-label={columnId}
           value={committed}
-          onFocus={() => {
-            focusedRef.current = true;
-            onActivate();
-          }}
-          onBlur={() => {
-            focusedRef.current = false;
-          }}
+          onFocus={() => onActivate()}
           onKeyDown={onKeyDown}
         />
       </td>
@@ -275,8 +285,8 @@ function SheetCell({
   }
 
   if (columnId === "secaoCondutor") {
-    const options = text && !(CONDUCTOR_SECTIONS as readonly string[]).includes(text)
-      ? [text, ...CONDUCTOR_SECTIONS]
+    const options = committed && !(CONDUCTOR_SECTIONS as readonly string[]).includes(committed)
+      ? [committed, ...CONDUCTOR_SECTIONS]
       : [...CONDUCTOR_SECTIONS];
     return (
       <td className={className}>
@@ -285,25 +295,11 @@ function SheetCell({
             inputRef.current = el;
           }}
           data-sheet-cell="1"
+          data-sheet-pos={pos}
           aria-label={columnId}
-          value={text}
-          onPointerDown={() => {
-            focusedRef.current = true;
-            onActivate();
-          }}
-          onFocus={() => {
-            focusedRef.current = true;
-            onActivate();
-          }}
-          onBlur={() => {
-            focusedRef.current = false;
-          }}
-          onChange={(event) => {
-            const value = event.target.value;
-            remember(value);
-            onCommit(value);
-          }}
-          onKeyDown={onKeyDown}
+          defaultValue={committed}
+          onChange={(event) => onCommit(event.target.value)}
+          {...bindField}
         >
           <option value="" />
           {options.map((size) => (
@@ -322,25 +318,11 @@ function SheetCell({
             inputRef.current = el;
           }}
           data-sheet-cell="1"
+          data-sheet-pos={pos}
           aria-label={columnId}
-          value={text}
-          onPointerDown={() => {
-            focusedRef.current = true;
-            onActivate();
-          }}
-          onFocus={() => {
-            focusedRef.current = true;
-            onActivate();
-          }}
-          onBlur={() => {
-            focusedRef.current = false;
-          }}
-          onChange={(event) => {
-            const value = event.target.value as Polaridade;
-            remember(value);
-            onCommit(value);
-          }}
-          onKeyDown={onKeyDown}
+          defaultValue={committed}
+          onChange={(event) => onCommit(event.target.value)}
+          {...bindField}
         >
           <option value="" />
           <option value="Ok">Ok</option>
@@ -358,27 +340,14 @@ function SheetCell({
         }}
         type="text"
         data-sheet-cell="1"
+        data-sheet-pos={pos}
         aria-label={columnId}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        value={text}
-        onPointerDown={() => {
-          focusedRef.current = true;
-          onActivate();
-        }}
-        onFocus={() => {
-          focusedRef.current = true;
-          onActivate();
-        }}
-        onChange={(event) => remember(event.target.value)}
-        onInput={(event) => remember((event.target as HTMLInputElement).value)}
-        onBlur={() => {
-          focusedRef.current = false;
-          flush();
-        }}
-        onKeyDown={onKeyDown}
+        defaultValue={committed}
+        {...bindField}
       />
     </td>
   );
